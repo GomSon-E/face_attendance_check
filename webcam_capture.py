@@ -31,9 +31,8 @@ def face_detection_and_capture():
     # 최소 얼굴 크기 비율 설정 (전체 프레임 대비)
     min_face_ratio = 0.20  # 20%
     
-    # 이미지 저장 간격 (초)
-    capture_cooldown = 2
-    last_capture_time = time.time() - capture_cooldown
+    # 이미지를 한 번만 저장하기 위한 플래그
+    image_captured = False
     
     while True:
         # 프레임 읽기
@@ -55,8 +54,8 @@ def face_detection_and_capture():
             minSize=(30, 30)
         )
         
-        current_time = time.time()
-        capture_ready = current_time - last_capture_time > capture_cooldown
+        # 이미 이미지가 캡처되었는지 확인
+        capture_ready = not image_captured
         
         # 감지된 얼굴에 사각형 표시
         for (x, y, w, h) in faces:
@@ -73,13 +72,13 @@ def face_detection_and_capture():
             ratio_text = f"Face ratio: {face_ratio:.2%}"
             cv2.putText(frame, ratio_text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness)
             
-            # 일정 크기 이상이고 쿨다운 시간이 지났다면 이미지 저장
+            # 일정 크기 이상이고 이미지가 아직 캡쳐된 적이 없다면면 이미지 저장
             if face_ratio > min_face_ratio and capture_ready:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = os.path.join(save_dir, f"face_{timestamp}.jpg")
                 cv2.imwrite(filename, frame)
                 print(f"얼굴 이미지가 저장되었습니다: {filename}")
-                last_capture_time = current_time
+                image_captured = True  # 이미지가 캡처되었음을 표시
                 
                 # 저장 표시
                 cv2.putText(frame, "Saved!", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
