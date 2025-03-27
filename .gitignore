@@ -1,2 +1,8 @@
 .face_env/
 face_env/
+
+.captured_faces/
+captured_faces/
+
+.data_faces/
+data_faces/
