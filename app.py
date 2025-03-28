@@ -9,10 +9,16 @@ from typing import Dict, Any
 # 자체 모듈 임포트
 from config import DATA_DIR, CSV_PATH
 from utils import init_csv_file
-from face_utils import process_face_image, get_all_faces, delete_face_data
+from face_utils import (
+    process_face_image, 
+    get_all_faces, 
+    delete_face_data, 
+    detect_face, 
+    compare_face
+)
 
 # FastAPI 앱 생성
-app = FastAPI(title="얼굴 특징 벡터 추출 API")
+app = FastAPI(title="얼굴 특징 벡터 추출 및 비교 API")
 
 # 정적 파일 서빙 (HTML, CSS, JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -28,6 +34,11 @@ init_csv_file()
 async def read_root():
     """루트 경로 접근 시 인덱스 페이지 반환"""
     return FileResponse('static/index.html')
+
+@app.get("/face_compare")
+async def face_compare_page():
+    """얼굴 비교 페이지 반환"""
+    return FileResponse('static/face_compare.html')
 
 @app.post("/api/capture-face")
 async def capture_face(data: Dict[str, Any] = Body(...)):
@@ -77,6 +88,44 @@ async def delete_face(face_id: int):
         traceback_str = traceback.format_exc()
         print(f"얼굴 데이터 삭제 중 오류: {str(e)}\n{traceback_str}")
         raise HTTPException(status_code=500, detail=f"얼굴 데이터 삭제 중 오류: {str(e)}")
+
+@app.post("/api/detect-face")
+async def detect_face_api(data: Dict[str, Any] = Body(...)):
+    """이미지에서 얼굴 감지"""
+    try:
+        image_data = data.get("image")
+        
+        if not image_data:
+            raise HTTPException(status_code=400, detail="이미지 데이터가 필요합니다.")
+        
+        result = detect_face(image_data)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"얼굴 감지 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"얼굴 감지 중 오류: {str(e)}")
+
+@app.post("/api/compare-face")
+async def compare_face_api(data: Dict[str, Any] = Body(...)):
+    """캡처된 얼굴과 등록된 얼굴들 비교"""
+    try:
+        image_data = data.get("image")
+        
+        if not image_data:
+            raise HTTPException(status_code=400, detail="이미지 데이터가 필요합니다.")
+        
+        result = compare_face(image_data)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"얼굴 비교 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"얼굴 비교 중 오류: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
