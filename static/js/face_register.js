@@ -1,4 +1,4 @@
-// static/js/main.js
+// static/js/face_register.js
 $(document).ready(function() {
     // 요소 참조
     const $webcam = $('#webcam');
