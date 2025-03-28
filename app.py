@@ -30,10 +30,10 @@ print(f"데이터 디렉토리 경로: {os.path.abspath(DATA_DIR)}")
 # 서버 시작 시 CSV 파일 초기화
 init_csv_file()
 
-@app.get("/")
+@app.get("/face_register")
 async def read_root():
     """루트 경로 접근 시 인덱스 페이지 반환"""
-    return FileResponse('static/index.html')
+    return FileResponse('static/face_register.html')
 
 @app.get("/face_compare")
 async def face_compare_page():
