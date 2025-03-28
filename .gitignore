@@ -8,6 +8,7 @@ captured_faces/
 data_faces/
 
 face_encodings.csv
+attendance_records.csv
 
 __pycache__/
 *.pyc
