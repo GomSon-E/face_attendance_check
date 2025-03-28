@@ -6,3 +6,8 @@ captured_faces/
 
 .data_faces/
 data_faces/
+
+face_encodings.csv
+
+__pycache__/
+*.pyc
