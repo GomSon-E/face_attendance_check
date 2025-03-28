@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 
 # 자체 모듈 임포트
 from config import DATA_DIR, FACE_MODEL, DETECTOR_BACKEND, create_path
-from utils import sanitize_filename, vector_to_string, save_to_csv, string_to_vector
+from utils import sanitize_filename, vector_to_string, save_to_csv, string_to_vector, record_attendance
 
 # DeepFace 로드
 try:
@@ -26,11 +26,6 @@ def process_face_image(name, image_data):
     safe_name = sanitize_filename(name)  # 한글 이름 문제 해결
     image_filename = f"{safe_name}_{timestamp}.jpg"
     image_path = create_path(DATA_DIR, image_filename)  # 슬래시 경로 사용
-    
-    print(f"원본 이름: {name}")
-    print(f"변환된 이름: {safe_name}")
-    print(f"이미지 저장 경로 (상대): {image_path}")
-    print(f"이미지 저장 경로 (절대): {os.path.abspath(image_path)}")
     
     # Base64 이미지 데이터 디코딩
     try:
@@ -408,4 +403,30 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         return {
             "success": False,
             "message": f"얼굴 비교 중 오류: {str(e)}"
+        }
+
+def register_attendance(name, image_data=None):
+    """출퇴근 기록 등록"""
+    try:
+        # 출퇴근 기록
+        result = record_attendance(name)
+        
+        # 이미지 데이터가 있으면 얼굴 추가 등록
+        if image_data and result['success']:
+            try:
+                # 이미지 추가 등록 (옵션)
+                face_result = process_face_image(name, image_data)
+                result['face_registered'] = True
+            except Exception as e:
+                print(f"추가 얼굴 등록 중 오류: {str(e)}")
+                result['face_registered'] = False
+        
+        return result
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"출퇴근 기록 등록 중 오류: {str(e)}\n{traceback_str}")
+        return {
+            'success': False,
+            'message': f"출퇴근 기록 등록 중 오류: {str(e)}"
         }

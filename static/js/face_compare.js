@@ -27,6 +27,9 @@ $(document).ready(function() {
     let lastCaptureTime = 0;
     let isComparingFace = false;
     let faceDetectionInterval = null;
+    let isRegisteringAttendance = false;
+    let attendanceRegistrationTimer = null;
+    let resetPageTimer = null;
     const API_URL = window.location.origin;
     
     // 설정값
@@ -329,12 +332,14 @@ $(document).ready(function() {
             let confidenceClass = 'match-low';
             let barClass = 'bar-low';
             let confidenceText = '낮음';
+            let isHighConfidence = false;
             
             const confidence = bestMatch.confidence;
             if (confidence >= 0.8) {
                 confidenceClass = 'match-high';
                 barClass = 'bar-high';
                 confidenceText = '높음';
+                isHighConfidence = true;
             } else if (confidence >= 0.6) {
                 confidenceClass = 'match-medium';
                 barClass = 'bar-medium';
@@ -343,6 +348,17 @@ $(document).ready(function() {
             
             // 신뢰도 퍼센트로 변환
             const confidencePercent = Math.round(confidence * 100);
+            
+            // 높은 신뢰도인 경우 자동으로 출퇴근 등록
+            if (isHighConfidence) {
+                // 이미 출퇴근 등록 중이 아니면 타이머 설정
+                if (!attendanceRegistrationTimer) {
+                    attendanceRegistrationTimer = setTimeout(function() {
+                        registerAttendance(bestMatch.name, confidence);
+                        attendanceRegistrationTimer = null;
+                    }, 500); // 0.5초 후 자동 등록
+                }
+            }
             
             // 결과 HTML 생성
             let resultsHtml = `
@@ -381,11 +397,34 @@ $(document).ready(function() {
                                 </div>
                             </div>
                         </div>
+            `;
+            
+            // 높은 신뢰도가 아니면 수동 출퇴근 등록 버튼을 표시하고, 
+            // 높은 신뢰도이면 자동 등록 메시지 표시
+            if (!isHighConfidence) {
+                resultsHtml += `
+                        <div class="match-actions">
+                            <button class="register-attendance-btn primary-btn" data-name="${bestMatch.name}" data-id="${bestMatch.id}">
+                                ${bestMatch.name} 님으로 출퇴근 등록
+                            </button>
+                        </div>
+                `;
+            } else {
+                resultsHtml += `
+                        <div class="match-actions">
+                            <div class="auto-register-message">
+                                <span class="spinner"></span> 자동으로 출퇴근 등록 중...
+                            </div>
+                        </div>
+                `;
+            }
+            
+            resultsHtml += `
                     </div>
                 </div>
             `;
             
-            // 다른 일치 결과가 있는 경우 추가
+            // 다른 유사한 얼굴 표시 (신뢰도에 상관없이 항상 표시)
             if (otherMatches && otherMatches.length > 0) {
                 resultsHtml += `
                     <div class="multiple-results">
@@ -396,10 +435,11 @@ $(document).ready(function() {
                 otherMatches.forEach(match => {
                     const matchPercent = Math.round(match.confidence * 100);
                     resultsHtml += `
-                        <div class="result-item">
+                        <div class="result-item" data-name="${match.name}" data-id="${match.id}">
                             <img src="data:image/jpeg;base64,${match.image_base64}" alt="${match.name}" class="result-image">
                             <div class="result-name">${match.name}</div>
                             <div class="result-confidence">일치도: ${matchPercent}%</div>
+                            <button class="select-face-btn secondary-btn">선택</button>
                         </div>
                     `;
                 });
@@ -412,6 +452,19 @@ $(document).ready(function() {
             
             // 결과 표시
             $compareResults.html(resultsHtml);
+            
+            // 출퇴근 등록 버튼 이벤트 설정
+            $('.register-attendance-btn').on('click', function() {
+                const name = $(this).data('name');
+                registerAttendance(name, confidence, capturedImageData);
+            });
+            
+            // 다른 얼굴 선택 버튼 이벤트 설정
+            $('.select-face-btn').on('click', function() {
+                const name = $(this).parent().data('name');
+                registerAttendance(name, confidence, capturedImageData);
+            });
+            
         } else {
             // 일치하는 얼굴이 없는 경우
             $compareResults.html(`
@@ -434,6 +487,125 @@ $(document).ready(function() {
                 </div>
             `);
         }
+    }
+    
+    // 출퇴근 기록 함수
+    function registerAttendance(name, confidence, imageData = null) {
+        if (isRegisteringAttendance) return;
+        
+        isRegisteringAttendance = true;
+        $spinner.removeClass('hidden');
+        updateStatus('출퇴근 기록 중...', 'info');
+        
+        // API 요청 데이터 준비
+        const requestData = {
+            name: name,
+            image: imageData // 이미지 데이터 항상 함께 전송하여 얼굴 추가 등록
+        };
+        
+        // API 요청
+        $.ajax({
+            url: `${API_URL}/api/register-attendance`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(requestData),
+            success: function(response) {
+                if (response.success) {
+                    // 성공 메시지 표시
+                    showAttendanceSuccess(response);
+                    
+                    // 5초 후 페이지 초기화
+                    resetPageTimer = setTimeout(function() {
+                        resetPageAfterAttendance();
+                    }, 5000);
+                } else {
+                    updateStatus(`출퇴근 기록 실패: ${response.message}`, 'error');
+                }
+            },
+            error: function(xhr, status, error) {
+                let errorMsg = '출퇴근 기록 중 오류가 발생했습니다.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.detail) {
+                    errorMsg = xhr.responseJSON.detail;
+                }
+                
+                console.error('Error:', error);
+                updateStatus(`오류: ${errorMsg}`, 'error');
+            },
+            complete: function() {
+                $spinner.addClass('hidden');
+                isRegisteringAttendance = false;
+            }
+        });
+    }
+    
+    // 출퇴근 성공 화면 표시
+    function showAttendanceSuccess(data) {
+        // 성공 메시지 HTML 생성
+        const tagClass = getTagClass(data.tag);
+        
+        const successHtml = `
+            <div class="attendance-success">
+                <div class="attendance-icon">✓</div>
+                <div class="attendance-name">${data.name}</div>
+                <div class="attendance-time">${data.date} ${data.time}</div>
+                ${data.tag ? `<div class="attendance-tag ${tagClass}">${data.tag}</div>` : ''}
+                <div class="attendance-message">출퇴근 기록이 성공적으로 저장되었습니다.</div>
+                ${data.face_registered ? '<div class="face-registered-message">새로운 얼굴 이미지가 등록되었습니다.</div>' : ''}
+                <div class="countdown">5초 후 초기화됩니다...</div>
+            </div>
+        `;
+        
+        // 화면에 추가
+        $('body').append(successHtml);
+        
+        // 카운트다운 표시
+        let countdown = 5;
+        const countdownInterval = setInterval(function() {
+            countdown--;
+            $('.countdown').text(`${countdown}초 후 초기화됩니다...`);
+            
+            if (countdown <= 0) {
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+    }
+    
+    // 태그에 따른 클래스 반환
+    function getTagClass(tag) {
+        if (tag === '출근') return 'tag-clock-in';
+        if (tag === '지각') return 'tag-late';
+        if (tag === '퇴근') return 'tag-clock-out';
+        return 'tag-none';
+    }
+    
+    // 출퇴근 등록 후 페이지 초기화
+    function resetPageAfterAttendance() {
+        // 성공 메시지 제거
+        $('.attendance-success').fadeOut(500, function() {
+            $(this).remove();
+        });
+        
+        // 타이머 초기화
+        if (resetPageTimer) {
+            clearTimeout(resetPageTimer);
+            resetPageTimer = null;
+        }
+        
+        // 결과 초기화
+        $compareResults.html('<p class="no-results">얼굴이 감지되면 자동으로 비교 결과가 표시됩니다.</p>');
+        
+        // 상태 초기화
+        lastCaptureTime = 0;
+        capturedImageData = null;
+        $recognitionStatus.text('얼굴을 카메라에 비춰주세요...');
+        
+        // 카메라가 켜져 있으면 얼굴 감지 다시 시작
+        if (isCameraActive) {
+            startFaceDetection();
+        }
+        
+        updateStatus('준비 완료. 얼굴을 카메라에 비춰주세요.', 'info');
     }
     
     // 상태 메시지 업데이트 함수
@@ -492,6 +664,17 @@ $(document).ready(function() {
             $modal.css('display', 'none');
         }
     });
+    
+    // 초기화 시 타이머 정리
+    if (attendanceRegistrationTimer) {
+        clearTimeout(attendanceRegistrationTimer);
+        attendanceRegistrationTimer = null;
+    }
+
+    if (resetPageTimer) {
+        clearTimeout(resetPageTimer);
+        resetPageTimer = null;
+    }
     
     // 페이지 로드 시 실행
     updateStatus('준비 완료. 카메라 시작 버튼을 눌러 시작하세요.', 'info');

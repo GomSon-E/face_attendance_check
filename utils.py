@@ -5,7 +5,8 @@ import hashlib
 import pandas as pd
 import numpy as np
 import json
-from config import CSV_PATH
+import datetime
+from config import CSV_PATH, ATTENDANCE_CSV_PATH, ATTENDANCE_TIMES
 
 def init_csv_file():
     """CSV 파일 초기화 함수"""
@@ -85,3 +86,68 @@ def save_to_csv(name, image_path, encoding_vector, timestamp):
     except Exception as e:
         print(f"CSV 저장 오류: {str(e)}")
         return False
+    
+def init_attendance_csv():
+    """출퇴근 기록 CSV 파일 초기화"""
+    if not os.path.exists(ATTENDANCE_CSV_PATH):
+        df = pd.DataFrame(columns=['name', 'date', 'time', 'tag'])
+        df.to_csv(ATTENDANCE_CSV_PATH, index=False)
+        print(f"출퇴근 기록 CSV 파일 '{ATTENDANCE_CSV_PATH}'이 생성되었습니다.")
+
+def determine_attendance_tag():
+    """현재 시간에 따른 출퇴근 태그 결정"""
+    current_hour = datetime.datetime.now().hour
+    
+    if ATTENDANCE_TIMES["CLOCK_IN"][0] <= current_hour < ATTENDANCE_TIMES["CLOCK_IN"][1]:
+        return "출근"
+    elif ATTENDANCE_TIMES["LATE"][0] <= current_hour < ATTENDANCE_TIMES["LATE"][1]:
+        return "지각"
+    elif ATTENDANCE_TIMES["NONE"][0] <= current_hour < ATTENDANCE_TIMES["NONE"][1]:
+        return ""
+    elif ATTENDANCE_TIMES["CLOCK_OUT"][0] <= current_hour < ATTENDANCE_TIMES["CLOCK_OUT"][1]:
+        return "퇴근"
+    elif ATTENDANCE_TIMES["EARLY_CLOCK_IN"][0] <= current_hour < ATTENDANCE_TIMES["EARLY_CLOCK_IN"][1]:
+        return ""
+    else:
+        return ""
+
+def record_attendance(name):
+    """출퇴근 기록 저장"""
+    try:
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H:%M:%S")
+        tag = determine_attendance_tag()
+        
+        # CSV 파일 읽기 또는 생성
+        try:
+            df = pd.read_csv(ATTENDANCE_CSV_PATH)
+        except Exception as e:
+            print(f"CSV 파일 읽기 오류, 새 DataFrame 생성: {e}")
+            df = pd.DataFrame(columns=['name', 'date', 'time', 'tag'])
+        
+        # 새 기록 추가
+        new_row = {
+            'name': name,
+            'date': date_str,
+            'time': time_str,
+            'tag': tag
+        }
+        
+        # pd.concat 사용
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        df.to_csv(ATTENDANCE_CSV_PATH, index=False)
+        
+        return {
+            'success': True,
+            'name': name,
+            'date': date_str,
+            'time': time_str,
+            'tag': tag
+        }
+    except Exception as e:
+        print(f"출퇴근 기록 저장 오류: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e)
+        }

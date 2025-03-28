@@ -8,13 +8,14 @@ from typing import Dict, Any
 
 # 자체 모듈 임포트
 from config import DATA_DIR, CSV_PATH
-from utils import init_csv_file
+from utils import init_csv_file, init_attendance_csv
 from face_utils import (
     process_face_image, 
     get_all_faces, 
     delete_face_data, 
     detect_face, 
-    compare_face
+    compare_face,
+    register_attendance
 )
 
 # FastAPI 앱 생성
@@ -29,6 +30,7 @@ print(f"데이터 디렉토리 경로: {os.path.abspath(DATA_DIR)}")
 
 # 서버 시작 시 CSV 파일 초기화
 init_csv_file()
+init_attendance_csv()
 
 @app.get("/face_register")
 async def read_root():
@@ -126,6 +128,30 @@ async def compare_face_api(data: Dict[str, Any] = Body(...)):
         traceback_str = traceback.format_exc()
         print(f"얼굴 비교 중 오류: {str(e)}\n{traceback_str}")
         raise HTTPException(status_code=500, detail=f"얼굴 비교 중 오류: {str(e)}")
+
+@app.post("/api/register-attendance")
+async def register_attendance_api(data: Dict[str, Any] = Body(...)):
+    """출퇴근 기록 등록 API"""
+    try:
+        name = data.get("name")
+        image_data = data.get("image", None)
+        
+        if not name:
+            raise HTTPException(status_code=400, detail="이름이 필요합니다.")
+        
+        result = register_attendance(name, image_data)
+        
+        if result['success']:
+            return result
+        else:
+            raise HTTPException(status_code=500, detail=result['message'])
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"출퇴근 기록 등록 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"출퇴근 기록 등록 중 오류: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
