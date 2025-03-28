@@ -1,0 +1,440 @@
+/* static/css/style.css */
+:root {
+    --primary-color: #3498db;
+    --primary-dark: #2980b9;
+    --success-color: #2ecc71;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --secondary-color: #7f8c8d;
+    --text-color: #333;
+    --light-bg: #f8f9fa;
+    --dark-bg: #343a40;
+    --border-color: #dee2e6;
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Noto Sans KR', sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--light-bg);
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+header p {
+    color: #666;
+}
+
+main {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.capture-section, .results-section {
+    flex: 1;
+    min-width: 300px;
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+
+.capture-section h2, .results-section h2 {
+    color: var(--primary-dark);
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.webcam-container {
+    width: 100%;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+#webcam, #canvas, .capture-preview {
+    width: 100%;
+    height: 300px;
+    border-radius: 4px;
+    background-color: #f2f2f2;
+    object-fit: cover;
+}
+
+.capture-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.capture-preview img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.camera-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.primary-btn, .secondary-btn, .success-btn, .danger-btn {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.primary-btn:hover {
+    background-color: var(--primary-dark);
+}
+
+.secondary-btn {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.secondary-btn:hover {
+    background-color: #6a7778;
+}
+
+.success-btn {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.success-btn:hover {
+    background-color: #25a25a;
+}
+
+.danger-btn {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.danger-btn:hover {
+    background-color: #c0392b;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.person-info {
+    margin-top: 20px;
+}
+
+.person-info label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.person-info input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.results-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 15px;
+}
+
+.results-list {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+}
+
+.no-results {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+}
+
+.face-card {
+    display: flex;
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 15px;
+}
+
+.face-image {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.face-info {
+    flex: 1;
+}
+
+.face-name {
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.face-details {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.face-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.delete-button {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.delete-button:hover {
+    background-color: #c0392b;
+}
+
+.status-bar {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: var(--dark-bg);
+    color: white;
+    border-radius: 4px;
+}
+
+.success {
+    background-color: var(--success-color);
+}
+
+.error {
+    background-color: var(--danger-color);
+}
+
+.warning {
+    background-color: var(--warning-color);
+}
+
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-left: 10px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* 모달 스타일 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 10% auto;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 500px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: black;
+}
+
+.modal-body {
+    margin-top: 15px;
+}
+
+.result-image {
+    max-width: 100%;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.success-message {
+    color: var(--success-color);
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+.error-message {
+    color: var(--danger-color);
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+/* 향상된 웹캠 프리뷰 스타일 */
+.enhanced-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.webcam-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    border-radius: 4px;
+    background-color: #f2f2f2;
+}
+
+#webcam {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 캡처된 이미지 프리뷰 스타일 향상 */
+.capture-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f2f2f2;
+    border-radius: 4px;
+}
+
+#capturedImage {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* 촬영 버튼 스타일 향상 */
+#captureBtn {
+    background-color: #e74c3c;
+    position: relative;
+    padding-left: 30px;
+}
+
+#captureBtn::before {
+    content: "";
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    background-color: white;
+    border-radius: 50%;
+}
+
+#captureBtn:hover {
+    background-color: #c0392b;
+}
+
+/* 처리 중 상태 표시 향상 */
+.processing-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 4px;
+}
+
+.processing-indicator .spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+}
+
+/* 반응형 스타일 */
+@media (max-width: 768px) {
+    main {
+        flex-direction: column;
+    }
+    
+    .capture-section, .results-section {
+        width: 100%;
+    }
+    
+    .camera-controls {
+        flex-wrap: wrap;
+    }
+}
