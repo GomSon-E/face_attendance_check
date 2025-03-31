@@ -335,12 +335,12 @@ $(document).ready(function() {
             let isHighConfidence = false;
             
             const confidence = bestMatch.confidence;
-            if (confidence >= 0.8) {
+            if (confidence >= 0.75) {
                 confidenceClass = 'match-high';
                 barClass = 'bar-high';
                 confidenceText = '높음';
                 isHighConfidence = true;
-            } else if (confidence >= 0.6) {
+            } else if (confidence >= 0.5) {
                 confidenceClass = 'match-medium';
                 barClass = 'bar-medium';
                 confidenceText = '중간';
