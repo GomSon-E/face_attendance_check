@@ -1,0 +1,147 @@
+/* static/css/attendance.css */
+/* 출퇴근 기록 조회 페이지 전용 스타일 */
+
+.filter-section, .results-section {
+    flex: 1;
+    min-width: 300px;
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+}
+
+.filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+}
+
+.filter-group input, .filter-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.filter-actions {
+    flex-basis: 100%;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.results-count {
+    font-weight: 500;
+    color: #555;
+}
+
+.table-container {
+    overflow-x: auto;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+tr:hover {
+    background-color: #f5f5f5;
+}
+
+.empty-message {
+    text-align: center;
+    padding: 30px;
+    color: #999;
+    font-size: 16px;
+}
+
+.tag-cell {
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 4px;
+    display: inline-block;
+    text-align: center;
+    min-width: 80px;
+}
+
+.tag-clock-in {
+    background-color: rgba(46, 204, 113, 0.15);
+    color: var(--success-color);
+}
+
+.tag-late {
+    background-color: rgba(243, 156, 18, 0.15);
+    color: var(--warning-color);
+}
+
+.tag-clock-out {
+    background-color: rgba(52, 152, 219, 0.15);
+    color: var(--primary-color);
+}
+
+.tag-none {
+    background-color: rgba(189, 195, 199, 0.15);
+    color: var(--secondary-color);
+}
+
+.export-link {
+    display: none;
+}
+
+/* 반응형 스타일 */
+@media (max-width: 768px) {
+    .filter-form {
+        flex-direction: column;
+    }
+    
+    .filter-group {
+        width: 100%;
+    }
+    
+    .results-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}

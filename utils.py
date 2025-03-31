@@ -151,3 +151,61 @@ def record_attendance(name):
             'success': False,
             'error': str(e)
         }
+
+def get_attendance_records(filters=None):
+    """출퇴근 기록 데이터 조회"""
+    
+    if not os.path.exists(ATTENDANCE_CSV_PATH):
+        return []
+    
+    try:
+        # CSV 파일 읽기
+        df = pd.read_csv(ATTENDANCE_CSV_PATH)
+        
+        # 누락된 값 처리
+        df = df.fillna('')
+        
+        # 필터링 적용
+        if filters:
+            # 이름 필터
+            if 'name' in filters and filters['name']:
+                df = df[df['name'].str.contains(filters['name'], case=False)]
+            
+            # 날짜 필터 (시작일)
+            if 'start_date' in filters and filters['start_date']:
+                df = df[df['date'] >= filters['start_date']]
+            
+            # 날짜 필터 (종료일)
+            if 'end_date' in filters and filters['end_date']:
+                df = df[df['date'] <= filters['end_date']]
+            
+            # 태그 필터
+            if 'tag' in filters and filters['tag']:
+                if filters['tag'] == 'empty':
+                    # 빈 태그 필터링
+                    df = df[df['tag'] == '']
+                else:
+                    df = df[df['tag'] == filters['tag']]
+        
+        # 날짜와 시간 기준으로 정렬 (최신순)
+        df = df.sort_values(by=['date', 'time'], ascending=[False, False])
+        
+        # NaN, Infinity 값을 처리하기 위한 함수
+        def safe_json_value(value):
+            if pd.isna(value) or np.isnan(value) if isinstance(value, float) else False:
+                return ""
+            elif np.isinf(value) if isinstance(value, float) else False:
+                return "Infinity" if value > 0 else "-Infinity"
+            else:
+                return value
+        
+        # 데이터프레임의 모든 값을 안전하게 변환
+        safe_df = df.applymap(safe_json_value)
+        
+        # 안전하게 변환된 데이터프레임을 딕셔너리 리스트로 변환
+        records = safe_df.to_dict('records')
+        
+        return records
+    except Exception as e:
+        print(f"출퇴근 기록 조회 중 오류: {str(e)}")
+        return []

@@ -5,10 +5,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from typing import Dict, Any
+import json
+import math
 
 # 자체 모듈 임포트
 from config import DATA_DIR, CSV_PATH
-from utils import init_csv_file, init_attendance_csv
+from utils import init_csv_file, init_attendance_csv, get_attendance_records
 from face_utils import (
     process_face_image, 
     get_all_faces, 
@@ -41,6 +43,11 @@ async def read_root():
 async def face_compare_page():
     """얼굴 비교 페이지 반환"""
     return FileResponse('static/face_compare.html')
+
+@app.get("/attendance")
+async def attendance_page():
+    """출퇴근 기록 조회 페이지 반환"""
+    return FileResponse('static/attendance.html')
 
 @app.post("/api/capture-face")
 async def capture_face(data: Dict[str, Any] = Body(...)):
@@ -152,6 +159,69 @@ async def register_attendance_api(data: Dict[str, Any] = Body(...)):
         traceback_str = traceback.format_exc()
         print(f"출퇴근 기록 등록 중 오류: {str(e)}\n{traceback_str}")
         raise HTTPException(status_code=500, detail=f"출퇴근 기록 등록 중 오류: {str(e)}")
+
+@app.get("/api/attendance")
+async def get_attendance_api(
+    name: str = None,
+    start_date: str = None,
+    end_date: str = None,
+    tag: str = None
+):
+    """출퇴근 기록 조회 API"""
+    try:
+        # 필터 구성
+        filters = {
+            'name': name,
+            'start_date': start_date,
+            'end_date': end_date,
+            'tag': tag
+        }
+        
+        # 필터가 모두 None이면 빈 필터로 설정
+        if all(value is None for value in filters.values()):
+            filters = None
+        
+        # 출퇴근 기록 조회
+        records = get_attendance_records(filters)
+        
+        # JSON 직렬화 가능 여부 확인 및 안전한 변환
+        def is_json_serializable(obj):
+            try:
+                json.dumps(obj)
+                return True
+            except (TypeError, OverflowError, ValueError):
+                return False
+        
+        # 안전하게 직렬화 가능한 값만 반환
+        safe_records = []
+        for record in records:
+            safe_record = {}
+            for key, value in record.items():
+                if is_json_serializable(value):
+                    safe_record[key] = value
+                else:
+                    # 문제가 있는 값은 문자열로 변환
+                    if isinstance(value, float):
+                        if math.isnan(value):
+                            safe_record[key] = ""
+                        elif math.isinf(value):
+                            safe_record[key] = "Infinity" if value > 0 else "-Infinity"
+                        else:
+                            safe_record[key] = str(value)
+                    else:
+                        safe_record[key] = str(value)
+            safe_records.append(safe_record)
+        
+        return {
+            "success": True,
+            "records": safe_records,
+            "total": len(safe_records)
+        }
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"출퇴근 기록 조회 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"출퇴근 기록 조회 중 오류: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
