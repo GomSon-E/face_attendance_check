@@ -190,22 +190,70 @@ def get_attendance_records(filters=None):
         # 날짜와 시간 기준으로 정렬 (최신순)
         df = df.sort_values(by=['date', 'time'], ascending=[False, False])
         
-        # NaN, Infinity 값을 처리하기 위한 함수
-        def safe_json_value(value):
-            if pd.isna(value) or np.isnan(value) if isinstance(value, float) else False:
-                return ""
-            elif np.isinf(value) if isinstance(value, float) else False:
-                return "Infinity" if value > 0 else "-Infinity"
-            else:
-                return value
+        # NaN, Infinity 값을 안전하게 처리
+        def safe_value(val):
+            if pd.isna(val) or (isinstance(val, float) and np.isnan(val)):
+                return ''
+            elif isinstance(val, float) and np.isinf(val):
+                return 'Infinity' if val > 0 else '-Infinity'
+            return val
         
-        # 데이터프레임의 모든 값을 안전하게 변환
-        safe_df = df.applymap(safe_json_value)
+        # pandas에서 안전하게 처리
+        df_safe = df.copy()
+        for col in df_safe.columns:
+            df_safe[col] = df_safe[col].apply(safe_value)
         
-        # 안전하게 변환된 데이터프레임을 딕셔너리 리스트로 변환
-        records = safe_df.to_dict('records')
+        # 딕셔너리 리스트로 변환
+        records = df_safe.to_dict('records')
         
         return records
     except Exception as e:
         print(f"출퇴근 기록 조회 중 오류: {str(e)}")
         return []
+
+def update_attendance_record(record_id, new_tag):
+    """출퇴근 기록의 태그 업데이트"""
+    try:
+        if not os.path.exists(ATTENDANCE_CSV_PATH):
+            return {
+                'success': False,
+                'message': '출퇴근 기록 파일이 존재하지 않습니다.'
+            }
+        
+        # CSV 파일 읽기
+        df = pd.read_csv(ATTENDANCE_CSV_PATH)
+        
+        # 누락된 값 처리
+        df = df.fillna('')
+        
+        # 인덱스 유효성 검사
+        if record_id < 0 or record_id >= len(df):
+            return {
+                'success': False,
+                'message': f'ID {record_id}의 출퇴근 기록을 찾을 수 없습니다.'
+            }
+        
+        # 이전 값 저장 (안전하게 처리)
+        old_tag = df.loc[record_id, 'tag']
+        if pd.isna(old_tag) or (isinstance(old_tag, float) and np.isnan(old_tag)):
+            old_tag = ''
+        
+        # 태그 업데이트
+        df.loc[record_id, 'tag'] = new_tag
+        
+        # CSV 파일에 저장
+        df.to_csv(ATTENDANCE_CSV_PATH, index=False)
+        
+        return {
+            'success': True,
+            'message': '출퇴근 기록이 성공적으로 업데이트되었습니다.',
+            'record_id': int(record_id),
+            'old_tag': old_tag,
+            'new_tag': new_tag
+        }
+    except Exception as e:
+        print(f"출퇴근 기록 업데이트 중 오류: {str(e)}")
+        return {
+            'success': False,
+            'message': f'출퇴근 기록 업데이트 중 오류: {str(e)}'
+        }

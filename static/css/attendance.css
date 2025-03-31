@@ -129,6 +129,96 @@ tr:hover {
     display: none;
 }
 
+/* 태그 편집 관련 스타일 */
+.tag-editable {
+    cursor: pointer;
+    position: relative;
+}
+
+.tag-editable:hover::after {
+    content: "✎";
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.tag-select {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: white;
+    width: 43%;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.tag-save-btn {
+    margin-left: 5px;
+    padding: 2px 8px;
+    border: none;
+    border-radius: 3px;
+    background-color: var(--success-color);
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.tag-cancel-btn {
+    margin-left: 3px;
+    padding: 2px 8px;
+    border: none;
+    border-radius: 3px;
+    background-color: var(--secondary-color);
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.tag-save-btn:hover {
+    background-color: #25a25a;
+}
+
+.tag-cancel-btn:hover {
+    background-color: #6a7778;
+}
+
+.tag-edit-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.tag-external {
+    background-color: rgba(155, 89, 182, 0.15);
+    color: #8e44ad;
+}
+
+.tag-half-day {
+    background-color: rgba(52, 73, 94, 0.15);
+    color: #2c3e50;
+}
+
+.saving-indicator {
+    display: inline-block;
+    margin-left: 5px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+/* 작은 스피너용 애니메이션 */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* 반응형 스타일 */
 @media (max-width: 768px) {
     .filter-form {

@@ -1,4 +1,5 @@
 // static/js/attendance.js
+
 $(document).ready(function() {
     // 요소 참조
     const $nameFilter = $('#nameFilter');
@@ -18,6 +19,12 @@ $(document).ready(function() {
     
     // 필터 상태 초기화
     let currentFilters = {};
+    
+    // 데이터 캐싱
+    let cachedData = [];
+    
+    // 태그 옵션
+    const tagOptions = ["출근", "퇴근", "외근", "지각", "반차", ""];
     
     // 페이지 로드 시 실행
     initPage();
@@ -71,6 +78,25 @@ $(document).ready(function() {
             if (event.key === 'Enter') {
                 $searchBtn.click();
             }
+        });
+        
+        // 태그 클릭 이벤트 위임
+        $attendanceTableBody.on('click', '.tag-editable', function() {
+            startTagEdit($(this));
+        });
+        
+        // 태그 저장 버튼 이벤트 위임
+        $attendanceTableBody.on('click', '.tag-save-btn', function() {
+            const rowId = $(this).closest('tr').data('id');
+            const newTag = $(this).siblings('.tag-select').val();
+            saveTagEdit(rowId, newTag, $(this).closest('td'));
+        });
+        
+        // 태그 취소 버튼 이벤트 위임
+        $attendanceTableBody.on('click', '.tag-cancel-btn', function() {
+            const rowId = $(this).closest('tr').data('id');
+            const record = cachedData.find(r => r.rowId === rowId);
+            cancelTagEdit($(this).closest('td'), record);
         });
     }
     
@@ -128,6 +154,14 @@ $(document).ready(function() {
             type: 'GET',
             success: function(response) {
                 if (response.success) {
+                    // 데이터에 행 ID 추가
+                    response.records.forEach((record, index) => {
+                        record.rowId = index;
+                    });
+                    
+                    // 데이터 캐싱
+                    cachedData = response.records;
+                    
                     displayAttendanceData(response.records);
                     updateStatus(`${response.total}개의 기록이 로드되었습니다.`, 'success');
                 } else {
@@ -165,11 +199,13 @@ $(document).ready(function() {
                 const tagDisplay = tag || '미지정';
                 
                 const row = `
-                    <tr>
+                    <tr data-id="${record.rowId}">
                         <td>${escapeHtml(name)}</td>
                         <td>${escapeHtml(date)}</td>
                         <td>${escapeHtml(time)}</td>
-                        <td><span class="tag-cell ${tagClass}">${escapeHtml(tagDisplay)}</span></td>
+                        <td>
+                            <span class="tag-cell ${tagClass} tag-editable" data-tag="${escapeHtml(tag)}">${escapeHtml(tagDisplay)}</span>
+                        </td>
                     </tr>
                 `;
                 
@@ -179,6 +215,88 @@ $(document).ready(function() {
             $emptyMessage.show();
             $recordsCount.text(0);
         }
+    }
+    
+    // 태그 편집 시작
+    function startTagEdit($tagCell) {
+        const currentTag = $tagCell.data('tag');
+        const $cell = $tagCell.closest('td');
+        
+        // 태그 선택 드롭다운 생성
+        let selectHtml = '<div class="tag-edit-cell">';
+        selectHtml += '<select class="tag-select">';
+        
+        tagOptions.forEach(tag => {
+            const displayTag = tag === '' ? '미지정' : tag;
+            const selected = tag === currentTag ? 'selected' : '';
+            selectHtml += `<option value="${tag}" ${selected}>${displayTag}</option>`;
+        });
+        
+        selectHtml += '</select>';
+        selectHtml += '<button class="tag-save-btn">저장</button>';
+        selectHtml += '<button class="tag-cancel-btn">취소</button>';
+        selectHtml += '</div>';
+        
+        // 셀 내용 교체
+        $cell.html(selectHtml);
+    }
+    
+    // 태그 편집 저장
+    function saveTagEdit(rowId, newTag, $cell) {
+        // 저장 표시기 추가
+        $cell.find('.tag-edit-cell').append('<span class="saving-indicator"></span>');
+        $cell.find('button, select').prop('disabled', true);
+        
+        // API 호출
+        $.ajax({
+            url: `${API_URL}/api/attendance/${rowId}`,
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({ tag: newTag }),
+            success: function(response) {
+                if (response.success) {
+                    // 캐시된 데이터 업데이트
+                    const recordIndex = cachedData.findIndex(r => r.rowId === rowId);
+                    if (recordIndex !== -1) {
+                        cachedData[recordIndex].tag = newTag;
+                    }
+                    
+                    // UI 업데이트
+                    const tagClass = getTagClass(newTag);
+                    const tagDisplay = newTag || '미지정';
+                    
+                    $cell.html(`<span class="tag-cell ${tagClass} tag-editable" data-tag="${escapeHtml(newTag)}">${escapeHtml(tagDisplay)}</span>`);
+                    
+                    updateStatus('태그가 성공적으로 업데이트되었습니다.', 'success');
+                } else {
+                    updateStatus(`태그 업데이트 실패: ${response.message}`, 'error');
+                    // 편집 상태로 복원하고 오류 표시
+                    startTagEdit($cell.find('.tag-cell'));
+                }
+            },
+            error: function(xhr, status, error) {
+                let errorMsg = '태그 업데이트 중 오류가 발생했습니다.';
+                
+                if (xhr.responseJSON && xhr.responseJSON.detail) {
+                    errorMsg = xhr.responseJSON.detail;
+                }
+                
+                console.error('Error:', error);
+                updateStatus(`오류: ${errorMsg}`, 'error');
+                
+                // 편집 상태로 복원
+                startTagEdit($cell.find('.tag-cell'));
+            }
+        });
+    }
+    
+    // 태그 편집 취소
+    function cancelTagEdit($cell, record) {
+        const tag = record ? record.tag || '' : '';
+        const tagClass = getTagClass(tag);
+        const tagDisplay = tag || '미지정';
+        
+        $cell.html(`<span class="tag-cell ${tagClass} tag-editable" data-tag="${escapeHtml(tag)}">${escapeHtml(tagDisplay)}</span>`);
     }
     
     // CSV로 내보내기 함수
@@ -258,6 +376,8 @@ $(document).ready(function() {
         if (tag === '출근') return 'tag-clock-in';
         if (tag === '지각') return 'tag-late';
         if (tag === '퇴근') return 'tag-clock-out';
+        if (tag === '외근') return 'tag-external';
+        if (tag === '반차') return 'tag-half-day';
         return 'tag-none';
     }
     

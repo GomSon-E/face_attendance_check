@@ -10,7 +10,7 @@ import math
 
 # 자체 모듈 임포트
 from config import DATA_DIR, CSV_PATH
-from utils import init_csv_file, init_attendance_csv, get_attendance_records
+from utils import init_csv_file, init_attendance_csv, get_attendance_records, update_attendance_record
 from face_utils import (
     process_face_image, 
     get_all_faces, 
@@ -184,32 +184,24 @@ async def get_attendance_api(
         # 출퇴근 기록 조회
         records = get_attendance_records(filters)
         
-        # JSON 직렬화 가능 여부 확인 및 안전한 변환
-        def is_json_serializable(obj):
-            try:
-                json.dumps(obj)
-                return True
-            except (TypeError, OverflowError, ValueError):
-                return False
-        
-        # 안전하게 직렬화 가능한 값만 반환
+        # JSON 직렬화를 위해 안전한 값으로 변환
         safe_records = []
         for record in records:
             safe_record = {}
             for key, value in record.items():
-                if is_json_serializable(value):
-                    safe_record[key] = value
-                else:
-                    # 문제가 있는 값은 문자열로 변환
-                    if isinstance(value, float):
-                        if math.isnan(value):
-                            safe_record[key] = ""
-                        elif math.isinf(value):
-                            safe_record[key] = "Infinity" if value > 0 else "-Infinity"
-                        else:
-                            safe_record[key] = str(value)
+                # 특수 부동 소수점 값 처리
+                if isinstance(value, float):
+                    if math.isnan(value):
+                        safe_record[key] = None  # NaN을 None으로 변환
+                    elif math.isinf(value):
+                        safe_record[key] = str(value)  # Infinity를 문자열로 변환
                     else:
-                        safe_record[key] = str(value)
+                        safe_record[key] = value
+                # 기타 비직렬화 가능한 객체 처리
+                elif not isinstance(value, (str, int, float, bool, list, dict, type(None))):
+                    safe_record[key] = str(value)
+                else:
+                    safe_record[key] = value
             safe_records.append(safe_record)
         
         return {
@@ -222,6 +214,35 @@ async def get_attendance_api(
         traceback_str = traceback.format_exc()
         print(f"출퇴근 기록 조회 중 오류: {str(e)}\n{traceback_str}")
         raise HTTPException(status_code=500, detail=f"출퇴근 기록 조회 중 오류: {str(e)}")
+
+@app.put("/api/attendance/{record_id}")
+async def update_attendance_api(record_id: int, data: Dict[str, Any] = Body(...)):
+    """출퇴근 기록 태그 수정 API"""
+    try:
+        tag = data.get("tag")
+        
+        if tag is None:
+            raise HTTPException(status_code=400, detail="태그 값이 필요합니다.")
+        
+        # 유효한 태그 값 확인
+        valid_tags = ["출근", "퇴근", "외근", "지각", "반차", ""]
+        if tag not in valid_tags:
+            raise HTTPException(status_code=400, detail=f"유효하지 않은 태그입니다. 유효한 값: {', '.join(valid_tags)}")
+        
+        # 출퇴근 기록 업데이트
+        result = update_attendance_record(record_id, tag)
+        
+        if result['success']:
+            return result
+        else:
+            raise HTTPException(status_code=404, detail=result['message'])
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"출퇴근 기록 수정 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"출퇴근 기록 수정 중 오류: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
