@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>전체 화면 자동 카메라</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+        }
+
+        #cameraview {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            transform: scaleX(-1);
+            object-fit: cover;
+            border: none;
+            margin: 0;
+        }
+
+        #status {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <video id="cameraview" playsinline autoplay></video>
+    <div id="status"></div>
+
+    <script>
+        var streamVideo;
+        var cameraView = document.getElementById("cameraview");
+        var statusDiv = document.getElementById("status");
+        
+        function checkBrowserSupport() {
+            if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                statusDiv.textContent = "오류: 이 브라우저는 카메라 접근을 지원하지 않습니다.";
+                statusDiv.style.color = "red";
+                return false;
+            }
+            return true;
+        }
+    
+        async function openCamera() {
+            try {
+                statusDiv.textContent = "카메라 접근 요청 중...";
+                
+                if (streamVideo) {
+                     const tracks = streamVideo.getTracks();
+                     tracks.forEach(track => track.stop());
+                }
+                streamVideo = null;
+                cameraView.srcObject = null;
+
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: "user" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+                
+                streamVideo = await navigator.mediaDevices.getUserMedia(constraints);
+                cameraView.srcObject = streamVideo;
+                
+                cameraView.play().then(() => {
+                    statusDiv.textContent = "카메라 상태: 활성화됨";
+                    statusDiv.style.color = "green";
+                }).catch(error => {
+                    console.error("비디오 자동 재생 실패:", error);
+                    statusDiv.textContent = "오류: 비디오 자동 재생 실패 - " + error.message;
+                    statusDiv.style.color = "orange";
+                });
+                
+            } catch (error) {
+                console.error("카메라 접근 오류:", error);
+                statusDiv.textContent = "오류: 카메라 접근 실패 - " + error.message;
+                statusDiv.style.color = "red";
+                alert("카메라 접근에 실패했습니다: " + error.message);
+            }
+        }
+        
+        function closeCamera() {
+            if (streamVideo) {
+                const tracks = streamVideo.getTracks();
+                tracks.forEach(track => track.stop());
+                streamVideo = null;
+                cameraView.srcObject = null;
+                statusDiv.textContent = "카메라 상태: 종료됨";
+                statusDiv.style.color = "#666";
+            }
+        }
+        
+        function init() {
+            if (checkBrowserSupport()) {
+                openCamera();
+            }
+        }
+        
+        window.addEventListener('DOMContentLoaded', init);
+        window.addEventListener('beforeunload', closeCamera);
+        
+        window.addEventListener('resize', () => {
+            if (cameraView.srcObject) {
+                const currentDisplay = cameraView.style.display;
+                cameraView.style.display = 'none';
+                requestAnimationFrame(() => {
+                    cameraView.style.display = currentDisplay;
+                });
+            }
+        });
+    </script>
+</body>
+</html>
