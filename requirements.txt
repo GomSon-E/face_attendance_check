@@ -1,0 +1,15 @@
+deepface>=0.0.93
+fastapi>=0.115.0
+opencv-python>=4.5.5.64
+numpy>=1.23.5
+pandas>=2.0.0
+Pillow>=9.0.0
+
+uvicorn>=0.20.0
+python-multipart>=0.0.5
+
+mtcnn>=0.1.0
+retina-face>=0.0.1
+
+tqdm>=4.30.0
+requests>=2.27.1
