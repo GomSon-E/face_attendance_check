@@ -1,681 +1,566 @@
-// static/js/face_compare.js
-$(document).ready(function() {
-    // 요소 참조
-    const $webcam = $('#webcam');
-    const $canvas = $('#canvas');
-    const $faceDetectionStatus = $('#faceDetectionStatus');
-    const $capturePreview = $('#capturePreview');
-    const $capturedImage = $('#capturedImage');
-    const $startCameraBtn = $('#startCameraBtn');
-    const $recognitionStatus = $('#recognitionStatus');
-    const $spinner = $('#spinner');
-    const $compareResults = $('#compareResults');
-    const $statusMessage = $('#statusMessage');
-    const $modal = $('#modal');
-    const $modalTitle = $('#modalTitle');
-    const $modalBody = $('#modalBody');
-    const $closeModal = $('.close');
-    
-    // 변수 설정
-    let stream = null;
-    let capturedImageData = null;
-    let rawImageData = null;
-    let isCameraActive = false;
-    let isProcessing = false;
-    let faceDetected = false;
-    let faceRatio = 0;
-    let lastCaptureTime = 0;
-    let isComparingFace = false;
-    let faceDetectionInterval = null;
-    let isRegisteringAttendance = false;
-    let attendanceRegistrationTimer = null;
-    let resetPageTimer = null;
-    const API_URL = window.location.origin;
-    
-    // 설정값
-    const MIN_FACE_RATIO = 0.20;        // 최소 얼굴 비율 (전체 프레임 대비)
-    const CAPTURE_COOLDOWN = 5000;      // 캡처 간 최소 간격 (밀리초)
-    
-    // 카메라 시작 함수
-    function startCamera() {
-        updateStatus('카메라 접근 요청 중...', 'info');
-        
-        // 웹캠 활성화
-        navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user'  // 전면 카메라
-            }
-        })
-        .then(function(mediaStream) {
-            stream = mediaStream;
-            $webcam[0].srcObject = mediaStream;
-            $webcam[0].play();
-            
-            // 비디오가 로드되면 카메라 초기화 완료
-            $webcam[0].onloadedmetadata = function() {
-                isCameraActive = true;
-                
-                // 카메라가 시작되면 버튼 상태 변경
-                $startCameraBtn.text('카메라 중지');
-                
-                // 프리뷰 표시
-                $webcam.removeClass('hidden');
-                $capturePreview.addClass('hidden');
-                $capturedImage.attr('src', '');
-                
-                // 실시간 얼굴 감지 시작 (약간의 지연 후)
-                setTimeout(function() {
-                    startFaceDetection();
-                }, 1000);
-                
-                updateStatus('카메라가 활성화되었습니다. 얼굴을 감지하는 중...', 'success');
-            };
-        })
-        .catch(function(error) {
-            console.error('카메라 접근 오류:', error);
-            updateStatus(`카메라 접근 오류: ${error.message}`, 'error');
-        });
+// 카메라 스트림 객체
+var streamVideo = null;
+// 비디오 요소
+var cameraView = document.getElementById("cameraview");
+// 상태 표시 div 요소들
+var faceDetectionStatusElement = document.getElementById("faceDetectionStatus");
+var recognitionStatusElement = document.getElementById("recognitionStatus");
+var errorStatusElement = document.getElementById("errorStatus");
+// 캔버스 요소 및 2D 컨텍스트
+var hiddenCanvas = document.getElementById("hiddenCanvas");
+var ctx = hiddenCanvas ? hiddenCanvas.getContext("2d") : null; // hiddenCanvas가 null이 아닐 때만 context 가져옴
+
+// 결과 팝업 관련 요소들
+var resultPopupOverlay = document.getElementById("result-popup-overlay");
+var resultPopupContent = document.getElementById("result-popup-content");
+var popupTitleElement = document.getElementById("popup-title");
+var popupMessageElement = document.getElementById("popup-message");
+var matchListElement = document.getElementById("match-list");
+var popupCloseButton = document.getElementById("popup-close-button");
+var matchedFaceImageElement = document.getElementById("matchedFaceImage");
+
+
+// --- 상태 플래그 ---
+// 현재 프레임 처리 (캡처, 전송, 응답 대기) 중인지
+var isProcessing = false;
+// 얼굴 비교 작업이 진행 중인지
+var isComparingFace = false;
+
+
+// --- 설정 값 ---
+// 얼굴 영역이 전체 프레임의 최소 몇 %를 차지해야 충분히 크다고 판단할지
+const MIN_FACE_RATIO = 0.05;
+// API 전송 시 이미지 크기 축소 비율
+const IMAGE_SCALE_FACTOR = 0.5;
+
+// 비디오의 현재 프레임을 캡처하여 얼굴 감지 API로 전송
+function captureFrameAndSend() {
+    // 비디오가 준비되지 않았거나, 이미 처리 중이거나, 비교 작업 중이면 함수 종료
+    if (!cameraView || !streamVideo || cameraView.paused || cameraView.ended || isComparingFace) {
+         // 비교 작업 중이 아니면 다음 프레임 예약
+         if (!isComparingFace) {
+             requestAnimationFrame(captureFrameAndSend);
+         } else {
+         }
+        return;
     }
     
-    // 카메라 중지 함수
-    function stopCamera() {
-        if (stream) {
-            // 얼굴 감지 중지
-            if (faceDetectionInterval) {
-                clearInterval(faceDetectionInterval);
-                faceDetectionInterval = null;
-            }
-            
-            // 비디오 스트림 중지
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-            $webcam[0].srcObject = null;
-            isCameraActive = false;
-            
-            // 버튼 상태 변경
-            $startCameraBtn.text('카메라 시작');
-            
-            // 얼굴 감지 상태 숨기기
-            $faceDetectionStatus.empty();
-            
-            // 비교 결과 초기화
-            $compareResults.html('<p class="no-results">얼굴이 감지되면 자동으로 비교 결과가 표시됩니다.</p>');
-            
-            updateStatus('카메라가 중지되었습니다.', 'info');
-        }
-    }
-    
-    // 실시간 얼굴 감지 시작
-    function startFaceDetection() {
-        if (!stream || !isCameraActive) return;
-        
-        // 상태 초기화
-        faceDetected = false;
-        faceRatio = 0;
-        $recognitionStatus.text('얼굴을 카메라에 비춰주세요...');
-        
-        // 이전 인터벌이 있으면 제거
-        if (faceDetectionInterval) {
-            clearInterval(faceDetectionInterval);
-        }
-        
-        // 얼굴 감지 함수
-        function detectFace() {
-            if (!isCameraActive || isProcessing) return;
-            
-            isProcessing = true;
-            
-            try {
-                // 캔버스 설정
-                const video = $webcam[0];
-                const canvas = $canvas[0];
-                const context = canvas.getContext('2d');
-                
-                // 비디오 크기 확인
-                const width = video.videoWidth;
-                const height = video.videoHeight;
-                
-                if (!width || !height) {
-                    console.log('비디오 크기가 유효하지 않음:', width, 'x', height);
-                    isProcessing = false;
-                    return;
-                }
-                
-                // 비디오 크기에 맞게 캔버스 설정
-                canvas.width = width;
-                canvas.height = height;
-                
-                // 비디오 프레임을 캔버스에 그리기
-                context.drawImage(video, 0, 0, width, height);
-                
-                // 이미지 데이터 가져오기 (원본)
-                const originalImageData = canvas.toDataURL('image/jpeg');
-                
-                // 이미지 향상 적용
-                const imgData = context.getImageData(0, 0, width, height);
-                
-                // 이미지 향상 (밝기와 대비 조정)
-                const data = imgData.data;
-                const alpha = 1.5;  // 대비 (1.0 = 원본)
-                const beta = 30;    // 밝기 (-255 ~ 255)
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    // 빨강, 초록, 파랑 채널에 대해 대비와 밝기 조정
-                    data[i] = Math.min(255, Math.max(0, alpha * data[i] + beta));
-                    data[i+1] = Math.min(255, Math.max(0, alpha * data[i+1] + beta));
-                    data[i+2] = Math.min(255, Math.max(0, alpha * data[i+2] + beta));
-                }
-                
-                // 향상된 이미지 데이터를 캔버스에 그리기
-                context.putImageData(imgData, 0, 0);
-                
-                // 향상된 이미지 데이터 가져오기
-                const enhancedImageData = canvas.toDataURL('image/jpeg');
-                
-                // 얼굴 감지 API 호출
-                $.ajax({
-                    url: `${API_URL}/api/detect-face`,
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({
-                        image: enhancedImageData
-                    }),
-                    success: function(response) {
-                        if (response.success) {
-                            if (response.face_detected) {
-                                // 얼굴이 감지된 경우
-                                faceDetected = true;
-                                
-                                // 얼굴 비율 계산
-                                const frameArea = width * height;
-                                const faceArea = response.face_area.width * response.face_area.height;
-                                faceRatio = faceArea / frameArea;
-                                
-                                // 얼굴 비율을 퍼센트로 변환
-                                const ratioPercent = Math.round(faceRatio * 100);
-                                
-                                // 얼굴 크기에 따른 클래스 결정
-                                let ratioClass = 'face-ratio-low';
-                                if (faceRatio >= MIN_FACE_RATIO) {
-                                    ratioClass = 'face-ratio-high';
-                                } else if (faceRatio >= MIN_FACE_RATIO * 0.7) {
-                                    ratioClass = 'face-ratio-medium';
-                                }
-                                
-                                // 상태 메시지 표시
-                                $faceDetectionStatus.html(`
-                                    얼굴 크기: <span class="${ratioClass}">${ratioPercent}%</span>
-                                `);
-                                
-                                // 얼굴 크기가 충분히 크면 사진 촬영
-                                if (faceRatio >= MIN_FACE_RATIO) {
-                                    const currentTime = Date.now();
-                                    // 이전 캡처와의 시간 간격이 충분한지 확인
-                                    if (currentTime - lastCaptureTime > CAPTURE_COOLDOWN && !isComparingFace) {
-                                        // 바로 촬영 및 비교 시작
-                                        captureAndCompare(enhancedImageData);
-                                        $recognitionStatus.html(`<span class="confidence-high">얼굴 인식됨 - 비교 중...</span>`);
-                                    }
-                                } else {
-                                    // 얼굴이 너무 작음
-                                    $recognitionStatus.html(`얼굴이 너무 작습니다. 더 가까이 다가와주세요.`);
-                                }
-                            } else {
-                                // 얼굴이 감지되지 않은 경우
-                                faceDetected = false;
-                                faceRatio = 0;
-                                $faceDetectionStatus.empty();
-                                $recognitionStatus.text('얼굴을 카메라에 비춰주세요...');
-                            }
-                        } else {
-                            // 요청 처리 실패
-                            $recognitionStatus.html(`<span class="confidence-low">오류: ${response.message}</span>`);
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Face detection error:', error);
-                        $recognitionStatus.html('<span class="confidence-low">얼굴 감지 오류</span>');
-                    },
-                    complete: function() {
-                        isProcessing = false;
-                    }
-                });
-            } catch (error) {
-                console.error('이미지 처리 중 오류:', error);
-                isProcessing = false;
-            }
-        }
-        
-        // 일정 간격으로 얼굴 감지 수행
-        faceDetectionInterval = setInterval(detectFace, 500);
-    }
-    
-    // 사진 촬영 및 비교 함수
-    function captureAndCompare(enhancedImageData) {
-        if (!stream || isComparingFace) {
-            return;
-        }
-        
-        // 상태 업데이트
-        isComparingFace = true;
-        $spinner.removeClass('hidden');
-        $recognitionStatus.text('얼굴 비교 중...');
-        updateStatus('얼굴 비교 중...', 'info');
-        
-        // 캡처 시간 기록
-        lastCaptureTime = Date.now();
-        
-        // 캡처된 이미지 데이터 저장
-        capturedImageData = enhancedImageData;
-        
-        // API 요청 데이터 준비
-        const requestData = {
-            image: capturedImageData
-        };
-        
-        // API 요청 - 얼굴 비교
-        $.ajax({
-            url: `${API_URL}/api/compare-face`,
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(requestData),
-            success: function(response) {
-                if (response.success) {
-                    // 비교 결과 표시
-                    displayCompareResults(response);
-                    updateStatus('얼굴 비교가 완료되었습니다.', 'success');
-                    
-                    // 비교 결과에 따라 인식 상태 업데이트
-                    if (response.matches && response.matches.length > 0) {
-                        const bestMatch = response.matches[0];
-                        const confidence = Math.round(bestMatch.confidence * 100);
-                        $recognitionStatus.html(`<span class="confidence-high">${bestMatch.name} 님이 인식되었습니다 (유사도: ${confidence}%)</span>`);
-                    } else {
-                        $recognitionStatus.html(`<span class="confidence-low">등록된 얼굴과 일치하지 않습니다</span>`);
-                    }
-                } else {
-                    updateStatus(`얼굴 비교 실패: ${response.message}`, 'error');
-                    $compareResults.html(`<p class="no-results">얼굴 비교 실패: ${response.message}</p>`);
-                    $recognitionStatus.text('얼굴을 다시 인식해주세요.');
-                }
-            },
-            error: function(xhr, status, error) {
-                let errorMsg = '얼굴 비교 중 오류가 발생했습니다.';
-                
-                if (xhr.responseJSON && xhr.responseJSON.detail) {
-                    errorMsg = xhr.responseJSON.detail;
-                }
-                
-                console.error('Error:', error);
-                updateStatus(`오류: ${errorMsg}`, 'error');
-                $compareResults.html(`<p class="no-results">오류: ${errorMsg}</p>`);
-                $recognitionStatus.text('얼굴을 다시 인식해주세요.');
-            },
-            complete: function() {
-                // 로딩 표시 제거 및 처리 상태 초기화
-                $spinner.addClass('hidden');
-                isComparingFace = false;
-            }
-        });
-    }
-    
-    // 비교 결과 표시 함수
-    function displayCompareResults(response) {
-        if (response.matches && response.matches.length > 0) {
-            // 가장 일치도가 높은 결과
-            const bestMatch = response.matches[0];
-            const otherMatches = response.matches.slice(1);
-            
-            // 신뢰도에 따른 스타일 클래스
-            let confidenceClass = 'match-low';
-            let barClass = 'bar-low';
-            let confidenceText = '낮음';
-            let isHighConfidence = false;
-            
-            const confidence = bestMatch.confidence;
-            if (confidence >= 0.75) {
-                confidenceClass = 'match-high';
-                barClass = 'bar-high';
-                confidenceText = '높음';
-                isHighConfidence = true;
-            } else if (confidence >= 0.5) {
-                confidenceClass = 'match-medium';
-                barClass = 'bar-medium';
-                confidenceText = '중간';
-            }
-            
-            // 신뢰도 퍼센트로 변환
-            const confidencePercent = Math.round(confidence * 100);
-            
-            // 높은 신뢰도인 경우 자동으로 출퇴근 등록
-            if (isHighConfidence) {
-                // 이미 출퇴근 등록 중이 아니면 타이머 설정
-                if (!attendanceRegistrationTimer) {
-                    attendanceRegistrationTimer = setTimeout(function() {
-                        registerAttendance(bestMatch.name, confidence);
-                        attendanceRegistrationTimer = null;
-                    }, 500); // 0.5초 후 자동 등록
-                }
-            }
-            
-            // 결과 HTML 생성
-            let resultsHtml = `
-                <div class="match-result">
-                    <div class="match-header ${confidenceClass}">
-                        <span>${bestMatch.name} 님과 일치</span>
-                        <span class="confidence-info">일치도: ${confidencePercent}% (${confidenceText})</span>
-                    </div>
-                    <div class="match-body">
-                        <div class="match-images">
-                            <div class="match-image-container">
-                                <div class="match-image-title">촬영된 얼굴</div>
-                                <img src="${capturedImageData}" alt="촬영된 얼굴" class="match-image">
-                            </div>
-                            <div class="match-image-container">
-                                <div class="match-image-title">등록된 얼굴</div>
-                                <img src="data:image/jpeg;base64,${bestMatch.image_base64}" alt="${bestMatch.name}" class="match-image">
-                            </div>
-                        </div>
-                        <div class="match-details">
-                            <div class="match-info-item">
-                                <div class="match-info-label">이름:</div>
-                                <div class="match-info-value">${bestMatch.name}</div>
-                            </div>
-                            <div class="match-info-item">
-                                <div class="match-info-label">등록일:</div>
-                                <div class="match-info-value">${formatDate(bestMatch.timestamp)}</div>
-                            </div>
-                            <div class="match-info-item">
-                                <div class="match-info-label">일치도:</div>
-                                <div class="match-info-value">
-                                    <span class="${confidenceClass}">${confidencePercent}% (${confidenceText})</span>
-                                    <div class="confidence-bar-container">
-                                        <div class="confidence-bar ${barClass}" style="width: ${confidencePercent}%"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-            `;
-            
-            // 높은 신뢰도가 아니면 수동 출퇴근 등록 버튼을 표시하고, 
-            // 높은 신뢰도이면 자동 등록 메시지 표시
-            if (!isHighConfidence) {
-                resultsHtml += `
-                        <div class="match-actions">
-                            <button class="register-attendance-btn primary-btn" data-name="${bestMatch.name}" data-id="${bestMatch.id}">
-                                ${bestMatch.name} 님으로 출퇴근 등록
-                            </button>
-                        </div>
-                `;
-            } else {
-                resultsHtml += `
-                        <div class="match-actions">
-                            <div class="auto-register-message">
-                                <span class="spinner"></span> 자동으로 출퇴근 등록 중...
-                            </div>
-                        </div>
-                `;
-            }
-            
-            resultsHtml += `
-                    </div>
-                </div>
-            `;
-            
-            // 다른 유사한 얼굴 표시 (신뢰도에 상관없이 항상 표시)
-            if (otherMatches && otherMatches.length > 0) {
-                resultsHtml += `
-                    <div class="multiple-results">
-                        <div class="multiple-title">다른 유사한 얼굴 (${otherMatches.length})</div>
-                        <div class="result-list">
-                `;
-                
-                otherMatches.forEach(match => {
-                    const matchPercent = Math.round(match.confidence * 100);
-                    resultsHtml += `
-                        <div class="result-item" data-name="${match.name}" data-id="${match.id}">
-                            <img src="data:image/jpeg;base64,${match.image_base64}" alt="${match.name}" class="result-image">
-                            <div class="result-name">${match.name}</div>
-                            <div class="result-confidence">일치도: ${matchPercent}%</div>
-                            <button class="select-face-btn secondary-btn">선택</button>
-                        </div>
-                    `;
-                });
-                
-                resultsHtml += `
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // 결과 표시
-            $compareResults.html(resultsHtml);
-            
-            // 출퇴근 등록 버튼 이벤트 설정
-            $('.register-attendance-btn').on('click', function() {
-                const name = $(this).data('name');
-                registerAttendance(name, confidence, capturedImageData);
-            });
-            
-            // 다른 얼굴 선택 버튼 이벤트 설정
-            $('.select-face-btn').on('click', function() {
-                const name = $(this).parent().data('name');
-                registerAttendance(name, confidence, capturedImageData);
-            });
-            
-        } else {
-            // 일치하는 얼굴이 없는 경우
-            $compareResults.html(`
-                <div class="match-result">
-                    <div class="match-header match-low">
-                        <span>일치하는 얼굴을 찾을 수 없습니다</span>
-                    </div>
-                    <div class="match-body">
-                        <div class="match-images">
-                            <div class="match-image-container">
-                                <div class="match-image-title">촬영된 얼굴</div>
-                                <img src="${capturedImageData}" alt="촬영된 얼굴" class="match-image">
-                            </div>
-                        </div>
-                        <div class="match-details">
-                            <p>얼굴 데이터베이스에서 일치하는 얼굴을 찾을 수 없습니다.</p>
-                            <p>등록된 얼굴이 없거나 유사도가 너무 낮을 수 있습니다.</p>
-                        </div>
-                    </div>
-                </div>
-            `);
-        }
-    }
-    
-    // 출퇴근 기록 함수
-    function registerAttendance(name, confidence, imageData = null) {
-        if (isRegisteringAttendance) return;
-        
-        isRegisteringAttendance = true;
-        $spinner.removeClass('hidden');
-        updateStatus('출퇴근 기록 중...', 'info');
-        
-        // API 요청 데이터 준비
-        const requestData = {
-            name: name,
-            image: imageData // 이미지 데이터 항상 함께 전송하여 얼굴 추가 등록
-        };
-        
-        // API 요청
-        $.ajax({
-            url: `${API_URL}/api/register-attendance`,
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(requestData),
-            success: function(response) {
-                if (response.success) {
-                    // 성공 메시지 표시
-                    showAttendanceSuccess(response);
-                    
-                    // 5초 후 페이지 초기화
-                    resetPageTimer = setTimeout(function() {
-                        resetPageAfterAttendance();
-                    }, 5000);
-                } else {
-                    updateStatus(`출퇴근 기록 실패: ${response.message}`, 'error');
-                }
-            },
-            error: function(xhr, status, error) {
-                let errorMsg = '출퇴근 기록 중 오류가 발생했습니다.';
-                
-                if (xhr.responseJSON && xhr.responseJSON.detail) {
-                    errorMsg = xhr.responseJSON.detail;
-                }
-                
-                console.error('Error:', error);
-                updateStatus(`오류: ${errorMsg}`, 'error');
-            },
-            complete: function() {
-                $spinner.addClass('hidden');
-                isRegisteringAttendance = false;
-            }
-        });
-    }
-    
-    // 출퇴근 성공 화면 표시
-    function showAttendanceSuccess(data) {
-        // 성공 메시지 HTML 생성
-        const tagClass = getTagClass(data.tag);
-        
-        const successHtml = `
-            <div class="attendance-success">
-                <div class="attendance-icon">✓</div>
-                <div class="attendance-name">${data.name}</div>
-                <div class="attendance-time">${data.date} ${data.time}</div>
-                ${data.tag ? `<div class="attendance-tag ${tagClass}">${data.tag}</div>` : ''}
-                <div class="attendance-message">출퇴근 기록이 성공적으로 저장되었습니다.</div>
-                ${data.face_registered ? '<div class="face-registered-message">새로운 얼굴 이미지가 등록되었습니다.</div>' : ''}
-                <div class="countdown">5초 후 초기화됩니다...</div>
-            </div>
-        `;
-        
-        // 화면에 추가
-        $('body').append(successHtml);
-        
-        // 카운트다운 표시
-        let countdown = 5;
-        const countdownInterval = setInterval(function() {
-            countdown--;
-            $('.countdown').text(`${countdown}초 후 초기화됩니다...`);
-            
-            if (countdown <= 0) {
-                clearInterval(countdownInterval);
-            }
-        }, 1000);
-    }
-    
-    // 태그에 따른 클래스 반환
-    function getTagClass(tag) {
-        if (tag === '출근') return 'tag-clock-in';
-        if (tag === '지각') return 'tag-late';
-        if (tag === '퇴근') return 'tag-clock-out';
-        return 'tag-none';
-    }
-    
-    // 출퇴근 등록 후 페이지 초기화
-    function resetPageAfterAttendance() {
-        // 성공 메시지 제거
-        $('.attendance-success').fadeOut(500, function() {
-            $(this).remove();
-        });
-        
-        // 타이머 초기화
-        if (resetPageTimer) {
-            clearTimeout(resetPageTimer);
-            resetPageTimer = null;
-        }
-        
-        // 결과 초기화
-        $compareResults.html('<p class="no-results">얼굴이 감지되면 자동으로 비교 결과가 표시됩니다.</p>');
-        
-        // 상태 초기화
-        lastCaptureTime = 0;
-        capturedImageData = null;
-        $recognitionStatus.text('얼굴을 카메라에 비춰주세요...');
-        
-        // 카메라가 켜져 있으면 얼굴 감지 다시 시작
-        if (isCameraActive) {
-            startFaceDetection();
-        }
-        
-        updateStatus('준비 완료. 얼굴을 카메라에 비춰주세요.', 'info');
-    }
-    
-    // 상태 메시지 업데이트 함수
-    function updateStatus(message, type = 'info') {
-        $statusMessage.text(message);
-        
-        // 타입에 따라 스타일 변경
-        $('#statusBar').removeClass('success error warning info');
-        $('#statusBar').addClass(type);
-        
-        console.log(`[${type.toUpperCase()}] ${message}`);
-    }
-    
-    // 모달 표시 함수
-    function showModal(title, content) {
-        $modalTitle.text(title);
-        $modalBody.html(content);
-        $modal.css('display', 'block');
-    }
-    
-    // 날짜 포맷팅 함수
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        
-        const date = new Date(dateString);
-        
-        if (isNaN(date.getTime())) {
-            return dateString; // 변환할 수 없는 경우 원본 반환
-        }
-        
-        return date.toLocaleString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-    
-    // 이벤트 리스너 설정
-    $startCameraBtn.on('click', function() {
-        if (stream) {
-            stopCamera();
-        } else {
-            startCamera();
-        }
-    });
-    
-    // 모달 닫기
-    $closeModal.on('click', function() {
-        $modal.css('display', 'none');
-    });
-    
-    $(window).on('click', function(event) {
-        if (event.target === $modal[0]) {
-            $modal.css('display', 'none');
-        }
-    });
-    
-    // 초기화 시 타이머 정리
-    if (attendanceRegistrationTimer) {
-        clearTimeout(attendanceRegistrationTimer);
-        attendanceRegistrationTimer = null;
+    // 이미 전송 중인 경우 바로 다음 프레임 예약하고 종료
+    if (isProcessing) {
+         requestAnimationFrame(captureFrameAndSend);
+         return;
     }
 
-    if (resetPageTimer) {
-        clearTimeout(resetPageTimer);
-        resetPageTimer = null;
+
+    isProcessing = true; // 프레임 처리 시작 플래그 설정
+
+    // 비디오 메타데이터 로드 대기 (videoWidth/videoHeight 사용 가능 확인)
+    if (!cameraView || cameraView.videoWidth === 0 || cameraView.videoHeight === 0) {
+         isProcessing = false; // 플래그 해제
+         requestAnimationFrame(captureFrameAndSend); // 다음 프레임에서 다시 시도
+         return;
     }
+
+     // 캔버스 컨텍스트 유효성 재확인 (capture 루프 내에서 안전 장치)
+    if (!ctx || !hiddenCanvas) {
+        console.error("Canvas context or element is not available during capture.");
+        isProcessing = false;
+        if(errorStatusElement) {
+             errorStatusElement.textContent = "오류: 캔버스 문제 발생.";
+             errorStatusElement.className = 'status-error';
+        }
+        // 심각한 오류이므로 루프 중단 고려
+        isComparingFace = true; // 캔버스 오류 시 루프 중단
+        closeCamera(); // 카메라 종료
+        return;
+    }
+
+
+    // 캔버스 크기를 비디오의 실제 크기에 맞춰 그릴 크기로 조절
+    const drawWidth = cameraView.videoWidth * IMAGE_SCALE_FACTOR;
+    const drawHeight = cameraView.videoHeight * IMAGE_SCALE_FACTOR;
     
-    // 페이지 로드 시 실행
-    updateStatus('준비 완료. 카메라 시작 버튼을 눌러 시작하세요.', 'info');
-});
+    hiddenCanvas.width = drawWidth;
+    hiddenCanvas.height = drawHeight;
+
+    // 현재 비디오 프레임을 캔버스에 그립니다.
+    ctx.drawImage(cameraView, 0, 0, drawWidth, drawHeight);
+
+    // 캔버스 이미지 데이터를 JPEG Base64 문자열로 가져옵니다.
+    // "data:image/jpeg;base64," 접두사를 제거합니다.
+    const imageData = hiddenCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+     // 얼굴 감지 API로 데이터 전송
+    fetch('/api/detect-face', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json' // JSON 형식으로 전송
+        },
+        body: JSON.stringify({ image: imageData }) // 이미지 데이터를 JSON 본문에 담아 전송
+    })
+    .then(response => {
+        // HTTP 오류(예: 400, 500) 처리
+        if (!response.ok) {
+            console.error(`Detect API HTTP error! status: ${response.status}`);
+             // JSON 파싱 실패 대비 catch 추가
+             return response.json().then(errorData => {
+                 console.error("Detect API Error Response:", errorData);
+                 throw new Error(`Detect API HTTP error! status: ${response.status}, detail: ${errorData.detail || 'Unknown API Error'}`);
+             }).catch(jsonError => {
+                 console.error("Failed to parse Detect API error response or construct error:", jsonError);
+                 throw new Error(`Detect API HTTP error! status: ${response.status}, ${response.statusText}`);
+             });
+        }
+        return response.json(); // 응답 본문을 JSON으로 파싱
+    })
+    .then(data => {
+        // --- 얼굴 감지 API 응답 처리 ---
+        if(errorStatusElement) { errorStatusElement.textContent = ''; errorStatusElement.className = ''; } // API 통신 성공 시 오류 메시지 초기화
+
+        if (data && data.success === true) {
+            if (data.face_detected === true && data.face_area) {
+                // 얼굴 감지 성공 및 얼굴 영역 데이터 존재
+
+                // 얼굴 크기 계산 (프레임 대비 얼굴 영역 비율)
+                const frameArea = drawWidth * drawHeight; // 캔버스(축소된 프레임) 영역
+                const faceArea = data.face_area.width * data.face_area.height; // 얼굴 영역
+                let currentFaceRatio = frameArea > 0 ? faceArea / frameArea : 0;
+
+                // 비율을 퍼센트로 변환 (소수점 제거)
+                const ratioPercent = Math.round(currentFaceRatio * 100);
+
+                // 얼굴 크기에 따라 상태 메시지 클래스 결정
+                let ratioClass = 'face-ratio-low';
+                let ratioMessage = `얼굴 크기: <span class="${ratioClass}">${ratioPercent}%</span> (작음)`;
+                if (recognitionStatusElement) {
+                    recognitionStatusElement.textContent = '얼굴을 더 가까이 비춰주세요.';
+                    recognitionStatusElement.className = 'status-waiting';
+                }
+
+
+                if (currentFaceRatio >= MIN_FACE_RATIO) {
+                    ratioClass = 'face-ratio-high'; // 충분히 큼
+                    ratioMessage = `얼굴 크기: <span class="${ratioClass}">${ratioPercent}%</span> (충분함)`;
+                
+                    if (recognitionStatusElement) {
+                        recognitionStatusElement.textContent = '얼굴 크기 확인 완료. 인식 시작...';
+                        recognitionStatusElement.className = 'status-success';
+                    }
+                
+                    // *** 얼굴 감지 응답에서 얼굴 영역 데이터 추출 ***
+                    const faceArea = data.face_area;
+                    // 얼굴 영역 여백을 약간 추가하기 위해 20% 더 크게 추출 (얼굴이 잘리는 것 방지)
+                    const margin = 0.2;
+                    
+                    // 여백을 추가한 얼굴 영역 계산
+                    let faceX = Math.max(0, faceArea.x - faceArea.width * margin);
+                    let faceY = Math.max(0, faceArea.y - faceArea.height * margin);
+                    let faceWidth = Math.min(drawWidth - faceX, faceArea.width * (1 + margin * 2));
+                    let faceHeight = Math.min(drawHeight - faceY, faceArea.height * (1 + margin * 2));
+                    
+                    // 얼굴 영역 추출을 위한 새 캔버스 생성
+                    const faceCanvas = document.createElement('canvas');
+                    const faceCtx = faceCanvas.getContext('2d');
+                    
+                    // 얼굴 영역 캔버스 크기 설정 (원본 이미지 크기에서의 얼굴 영역)
+                    faceCanvas.width = faceWidth;
+                    faceCanvas.height = faceHeight;
+                    
+                    // 원본 이미지에서 얼굴 영역만 새 캔버스에 그림
+                    faceCtx.drawImage(
+                        hiddenCanvas, 
+                        faceX, faceY, faceWidth, faceHeight, // 소스 이미지의 얼굴 영역
+                        0, 0, faceWidth, faceHeight // 대상 캔버스에 그릴 위치와 크기
+                    );
+                    
+                    // 압축 비율 적용 (50%)
+                    const compressCanvas = document.createElement('canvas');
+                    const compressCtx = compressCanvas.getContext('2d');
+                    compressCanvas.width = faceWidth * IMAGE_SCALE_FACTOR;
+                    compressCanvas.height = faceHeight * IMAGE_SCALE_FACTOR;
+                    
+                    // 얼굴 이미지를 압축 캔버스에 그림
+                    compressCtx.drawImage(
+                        faceCanvas,
+                        0, 0, faceWidth, faceHeight, // 소스 이미지(얼굴 캔버스)의 전체 영역
+                        0, 0, compressCanvas.width, compressCanvas.height // 압축된 크기
+                    );
+                    
+                    // 압축된 얼굴 이미지 데이터를 Base64 문자열로 변환
+                    const faceImageData = compressCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+                    
+                    // isComparingFace 플래그를 여기서 바로 설정하여 captureFrameAndSend 루프 중지
+                    isComparingFace = true; // 비교 시작 플래그 설정
+                    // 압축된 얼굴 이미지 데이터와 원본 비율을 전달
+                    performFaceComparison(faceImageData, ratioPercent, imageData); // 세 번째 매개변수로 원본 이미지도 함께 전달
+                    // detection 루프는 isComparingFace 플래그로 중단
+                } else if (currentFaceRatio >= MIN_FACE_RATIO * 0.7) { // MIN_FACE_RATIO의 70% 이상
+                    ratioClass = 'face-ratio-medium';
+                    ratioMessage = `얼굴 크기: <span class="${ratioClass}">${ratioPercent}%</span> (중간)`;
+                    if (recognitionStatusElement) {
+                        recognitionStatusElement.textContent = '조금 더 가까이 다가와주세요.';
+                         recognitionStatusElement.className = 'status-waiting';
+                    }
+
+                } else {
+                     // 얼굴 감지되었으나 비율이 MIN_FACE_RATIO * 0.7 미만인 경우
+                      ratioClass = 'face-ratio-low';
+                      ratioMessage = `얼굴 크기: <span class="${ratioClass}">${ratioPercent}%</span> (매우 작음)`;
+                       if (recognitionStatusElement) {
+                           recognitionStatusElement.textContent = '얼굴을 카메라 중앙에 크게 비춰주세요.';
+                           recognitionStatusElement.className = 'status-waiting';
+                       }
+                }
+
+                // 얼굴 감지 상태 메시지 업데이트 (얼굴 크기 표시)
+                if (faceDetectionStatusElement) {
+                    faceDetectionStatusElement.innerHTML = ratioMessage;
+                    faceDetectionStatusElement.className = 'status-normal';
+                }
+
+
+            } else {
+                // API 응답은 성공했으나 얼굴 미감지 시
+
+                // 상태 메시지 초기화 또는 얼굴 미감지 메시지 표시
+                 if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = '얼굴 크기: -'; faceDetectionStatusElement.className = 'status-normal'; }
+                 if (recognitionStatusElement) { recognitionStatusElement.textContent = '얼굴을 카메라에 비춰주세요...'; recognitionStatusElement.className = 'status-waiting'; }
+            }
+        } else {
+            // API 응답 실패 시
+             console.error("Detect API returned success: false", data);
+
+             if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = '얼굴 크기: -'; faceDetectionStatusElement.className = 'status-normal'; }
+             if (recognitionStatusElement) { recognitionStatusElement.innerHTML = `감지 요청 실패: ${data?.message || '알 수 없는 오류'}`; recognitionStatusElement.className = 'status-error'; }
+        }
+    })
+    .catch(error => {
+        // 얼굴 감지 API 요청 자체 실패
+        console.error("Detect API request failed:", error);
+        // 상태 표시 업데이트
+        if(errorStatusElement) { errorStatusElement.textContent = `감지 API 통신 오류: ${error.message}`; errorStatusElement.className = 'status-error'; }
+
+         // 얼굴 감지 안 된 것으로 간주 (루프는 계속 진행)
+         if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = '얼굴 크기: -'; faceDetectionStatusElement.className = 'status-normal'; }
+         if (recognitionStatusElement) { recognitionStatusElement.textContent = '얼굴을 카메라에 비춰주세요...'; recognitionStatusElement.className = 'status-waiting'; }
+    })
+    .finally(() => {
+        isProcessing = false; // 프레임 처리 완료 플래그 해제
+
+        // 비교 작업 중이 아니면 다음 프레임 캡처 예약
+        if (!isComparingFace) {
+             requestAnimationFrame(captureFrameAndSend);
+        } else {
+        }
+    });
+}
+
+// 얼굴 비교 API로 이미지 데이터를 전송하고 결과를 처리하는 함수
+async function performFaceComparison(faceImageData, finalFaceRatioPercent, originalImageData = null) {
+    if (recognitionStatusElement) { recognitionStatusElement.textContent = '얼굴 인식 중...'; recognitionStatusElement.className = 'status-waiting'; }
+    if (errorStatusElement) { errorStatusElement.textContent = ''; errorStatusElement.className = ''; } // 오류 메시지 초기화
+
+    console.log("Starting face comparison with API using cropped face image.");
+
+    try {
+       const response = await fetch('/api/compare-face', {
+           method: 'POST',
+           headers: {
+               'Content-Type': 'application/json' // JSON 형식으로 전송
+           },
+           body: JSON.stringify({ 
+               image: faceImageData // 추출 및 압축된 얼굴 이미지
+           })
+       });
+
+       if (!response.ok) {
+           console.error(`Compare API HTTP error! status: ${response.status}`);
+           const errorData = await response.json().catch(() => ({detail: response.statusText})); // JSON 파싱 실패 대비
+           console.error("Compare API Error Response:", errorData);
+           throw new Error(`Compare API HTTP error! status: ${response.status}, detail: ${errorData.detail || 'Unknown API Error'}`);
+       }
+
+       const data = await response.json(); // 응답 본문을 JSON으로 파싱
+       console.log("Compare API Response:", data);
+
+        // --- 얼굴 비교 API 응답 처리 ---
+       if (data && data.success === true) {
+           if (data.total_matches > 0 && Array.isArray(data.matches) && data.matches.length > 0) {
+               // 일치하는 얼굴이 발견됨
+
+                // *** 가장 유사도가 높은 얼굴 찾기 ***
+                const bestMatch = data.matches.reduce((prev, current) => {
+                    if (typeof prev?.confidence !== 'number') return current;
+                    if (typeof current?.confidence !== 'number') return prev;
+                    return (prev.confidence > current.confidence) ? prev : current;
+                }, data.matches[0]); // 초기값으로 첫 번째 요소 사용
+
+                if (recognitionStatusElement) { 
+                    recognitionStatusElement.textContent = `얼굴 인식 성공! (${bestMatch?.name || '일치'}: ${bestMatch?.confidence !== undefined ? Math.round(bestMatch.confidence * 100) + '%' : '정보 없음'})`; 
+                    recognitionStatusElement.className = 'status-success'; 
+                }
+
+                // *** 백엔드에서 반환하는 가장 일치하는 얼굴 이미지 데이터 ***
+                const bestMatchImageData = data.best_match_image;
+
+               // 결과 팝업 표시 - 가장 유사도가 높은 얼굴 정보 및 이미지 표시
+               showResultPopup(
+                   '얼굴 인식 성공!',
+                   `인식된 얼굴 크기: ${finalFaceRatioPercent}%<br>가장 일치하는 얼굴: ${bestMatch?.name || '알 수 없음'} (유사도: ${bestMatch?.confidence !== undefined ? Math.round(bestMatch.confidence * 100) + '%' : '정보 없음'})<br><span class="small-text">`,
+                   bestMatchImageData, // 이미지 데이터 전달
+                   'success'
+               );
+
+           } else {
+               // 일치하는 얼굴이 없음 (matches 배열이 비어있거나 total_matches가 0)
+                if (recognitionStatusElement) { recognitionStatusElement.textContent = '일치하는 얼굴 없음.'; recognitionStatusElement.className = 'status-normal'; }
+
+               // 결과 팝업 표시 - 일치 없음 메시지 (이미지 데이터는 없음)
+               showResultPopup(
+                   '일치하는 얼굴 없음',
+                   `인식된 얼굴 크기: ${finalFaceRatioPercent}%<br>등록된 얼굴 중에 일치하는 얼굴을 찾지 못했습니다.<br><span class="small-text">`,
+                   null, // 이미지 데이터 없음
+                   'normal'
+               );
+           }
+       } else {
+           // API 응답 실패 시
+            console.error("Compare API returned success: false", data);
+            if (recognitionStatusElement) { recognitionStatusElement.innerHTML = `인식 요청 실패: ${data?.message || '알 수 없는 오류'}`; recognitionStatusElement.className = 'status-error'; }
+
+            // 결과 팝업 표시 - 오류 메시지
+           showResultPopup('얼굴 인식 오류', `인식 요청 처리 중 오류가 발생했습니다: ${data?.message || '알 수 없는 오류'}`, null, 'error');
+       }
+
+    } catch (error) {
+        // 얼굴 비교 API 요청 자체 실패
+       console.error("Compare API request failed:", error);
+       if(errorStatusElement) { errorStatusElement.textContent = `인식 API 통신 오류: ${error.message}`; errorStatusElement.className = 'status-error'; }
+       if (recognitionStatusElement) { recognitionStatusElement.textContent = '얼굴 인식 오류 발생'; recognitionStatusElement.className = 'status-error'; }
+
+        // 결과 팝업 표시 - 오류 메시지
+       showResultPopup('얼굴 인식 오류', `API 통신 중 오류가 발생했습니다: ${error.message}`, null, 'error');
+
+    } finally {
+        isComparingFace = false; // 비교 작업 완료 플래그 해제
+        isProcessing = false; // 모든 처리가 끝났으므로 처리 중 플래그 해제
+
+        // 얼굴 비교 프로세스가 완료되었으므로 카메라 스트림 종료
+        closeCamera();
+    }
+}
+
+
+// 결과 팝업을 표시하는 함수 (성공, 실패, 일치 없음 등)
+function showResultPopup(title, message, imageDataUrl, type = 'success') { // imageDataUrl 인자 추가
+   // 팝업 내용 업데이트
+   popupTitleElement.textContent = title;
+   popupMessageElement.innerHTML = message;
+
+    // 이미지 데이터 처리
+    if (imageDataUrl) {
+        matchedFaceImageElement.src = `data:image/jpeg;base64,${imageDataUrl}`; // src 설정
+        matchedFaceImageElement.style.display = 'block'; // 이미지 보이게 함
+        // 필요시 이미지에 상태별 클래스 추가
+        matchedFaceImageElement.className = type || '';
+    } else {
+        matchedFaceImageElement.src = ''; // src 비우기
+        matchedFaceImageElement.style.display = 'none'; // 이미지 숨김
+        matchedFaceImageElement.className = ''; // 클래스 초기화
+    }
+
+
+   // 팝업 제목/메시지/버튼 색상 등을 타입에 따라 변경
+   if (resultPopupContent) {
+       resultPopupContent.className = ''; // 기존 클래스 초기화
+       resultPopupContent.classList.add('result-popup-content'); // 기본 클래스 추가
+       if (type) { // 타입이 제공되면 추가
+            resultPopupContent.classList.add(type);
+        }
+   }
+   // 개별 요소의 클래스 설정 시에도 null 체크
+   if (popupTitleElement) popupTitleElement.className = type || '';
+   if (popupMessageElement) popupMessageElement.className = type || '';
+   if (popupCloseButton) popupCloseButton.className = type || ''; // 버튼 색상 변경용 클래스
+
+
+   // 팝업 표시
+   if (resultPopupOverlay) { // 요소가 null이 아닐 때만 표시
+       resultPopupOverlay.classList.add('visible');
+   }
+}
+
+
+// 결과 팝업을 숨기는 함수
+function hideResultPopup() {
+    if (resultPopupOverlay) { // 요소가 null인지 확인
+        resultPopupOverlay.classList.remove('visible');
+        // 팝업 닫은 후 추가 작업 (여기서는 이미 카메라 종료됨)
+        console.log("Result popup closed.");
+    } else {
+         console.warn("Result popup overlay element not found when trying to hide popup.");
+    }
+}
+
+
+// 카메라 스트림 시작 및 비디오 재생
+async function openCamera() {
+    try {
+        // 상태 메시지 초기화 시에도 null 체크
+        if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = "카메라 접근 요청 중..."; faceDetectionStatusElement.className = 'status-waiting'; }
+        if (recognitionStatusElement) { recognitionStatusElement.textContent = ''; recognitionStatusElement.className = ''; }
+        if (errorStatusElement) { errorStatusElement.textContent = ''; errorStatusElement.className = ''; }
+
+
+        // 기존 스트림이 있으면 중지
+        if (streamVideo) {
+             const tracks = streamVideo.getTracks();
+             tracks.forEach(track => track.stop());
+        }
+        streamVideo = null;
+        // cameraView가 null이 아닐 때만 srcObject 설정
+        if (cameraView) cameraView.srcObject = null;
+
+        // 카메라 제약 조건 설정 (전면 카메라, 이상적인 해상도)
+        const constraints = {
+            video: {
+                facingMode: { ideal: "user" }, // 전면 카메라 사용
+                 width: { ideal: 1280 }, // 이상적인 해상도 요청
+                 height: { ideal: 720 }
+            }
+        };
+
+        // 카메라 스트림 가져오기
+        streamVideo = await navigator.mediaDevices.getUserMedia(constraints);
+        // cameraView가 null이 아닐 때만 srcObject 설정
+        if (cameraView) cameraView.srcObject = streamVideo;
+
+        // 비디오 스트림 재생
+        // cameraView가 null이 아닐 때만 play() 호출
+        if (cameraView) {
+             cameraView.play().then(() => {
+                 console.log("Video playback started.");
+
+                 // 비디오 메타데이터 로드 대기
+                 // metadata가 로드되면 captureFrameAndSend 시작
+                 cameraView.onloadedmetadata = () => {
+                      console.log("Video metadata loaded. Starting capture loop.");
+                      // 상태 메시지 업데이트 시 null 체크
+                      if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = "카메라 상태: 활성화됨."; faceDetectionStatusElement.className = 'status-normal'; }
+                      if (recognitionStatusElement) { recognitionStatusElement.textContent = '얼굴을 카메라에 비춰주세요...'; recognitionStatusElement.className = 'status-waiting'; }
+                      if (errorStatusElement) { errorStatusElement.textContent = ''; errorStatusElement.className = ''; }
+
+                      // 상태 플래그 초기화
+                      isProcessing = false;
+                      isComparingFace = false;
+
+                      // 프레임 캡처 루프 시작
+                      captureFrameAndSend();
+                 };
+                  // 메타데이터가 이미 로드된 경우 (빠른 새로고침 등), 핸들러 수동 호출
+                 if(cameraView.readyState >= 2) {
+                     cameraView.onloadedmetadata();
+                 } else {
+                     // 메타데이터 로드 이벤트가 발생하지 않을 경우를 대비한 안전 장치
+                      console.warn("Video metadata not loaded yet, readyState:", cameraView.readyState);
+                      // 상태 메시지 업데이트 시 null 체크
+                      if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = "카메라 상태: 활성화됨. 메타데이터 로드 대기 중..."; faceDetectionStatusElement.className = 'status-waiting'; }
+                      // metadata 로드 이벤트 리스너 추가
+                      cameraView.addEventListener('loadedmetadata', cameraView.onloadedmetadata, { once: true });
+                 }
+
+
+             }).catch(error => {
+                 console.error("비디오 재생 실패:", error);
+                 // 상태 메시지 업데이트 시 null 체크
+                 if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = "오류: 비디오 재생 실패"; faceDetectionStatusElement.className = 'status-error'; }
+                 if (recognitionStatusElement) { recognitionStatusElement.textContent = error.message; recognitionStatusElement.className = 'status-error'; }
+                 if (errorStatusElement) { errorStatusElement.textContent = ''; errorStatusElement.className = ''; }
+                 alert("카메라 재생에 실패했습니다."); // 사용자에게 알림
+                 closeCamera(); // 재생 실패 시 카메라 중지
+             });
+        } else {
+             console.error("Camera view element is null, cannot play video.");
+              if (errorStatusElement) { errorStatusElement.textContent = "오류: 비디오 요소 로드 실패."; errorStatusElement.className = 'status-error'; }
+        }
+
+    } catch (error) {
+        console.error("카메라 접근 오류:", error);
+         // 상태 메시지 업데이트 시 null 체크
+         if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = "오류: 카메라 접근 실패"; faceDetectionStatusElement.className = 'status-error'; }
+         if (recognitionStatusElement) { recognitionStatusElement.textContent = ''; recognitionStatusElement.className = ''; }
+         if (errorStatusElement) { errorStatusElement.textContent = error.message; errorStatusElement.className = 'status-error'; }
+        alert("카메라 접근에 실패했습니다: " + error.message); // 사용자에게 알림
+    }
+}
+
+// 카메라 스트림 중지 함수
+function closeCamera() {
+    // 루프 중단 플래그 설정 (detection 및 comparison 루프 모두 체크)
+    isComparingFace = true; // 비교 루프 중단을 위해 설정
+
+    if (streamVideo) {
+        console.log("Stopping camera stream.");
+        const tracks = streamVideo.getTracks();
+        tracks.forEach(track => track.stop());
+        streamVideo = null;
+        // cameraView가 null이 아닐 때만 srcObject 설정 해제
+        if (cameraView) cameraView.srcObject = null;
+        // 캔버스 클리어 - ctx, hiddenCanvas가 null이 아닐 때만
+        if(ctx && hiddenCanvas) {
+            ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
+        }
+        // 비디오 요소의 크기 스타일 초기화 - cameraView가 null이 아닐 때만
+         if (cameraView) {
+             cameraView.style.width = '';
+             cameraView.style.height = '';
+         }
+
+        // 최종 상태 메시지 표시 및 플래그 초기화
+        // 상태 메시지 업데이트 시 null 체크
+        if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = "카메라 상태: 종료됨"; faceDetectionStatusElement.className = 'status-normal'; }
+        // recognitionStatusElement와 errorStatusElement는 마지막 메시지를 유지
+    } else {
+         // 스트림이 이미 null인 경우에도 상태 메시지만 업데이트
+         console.log("Camera stream already stopped.");
+         if (faceDetectionStatusElement) { faceDetectionStatusElement.textContent = "카메라 상태: 이미 종료됨"; faceDetectionStatusElement.className = 'status-normal'; }
+    }
+
+     // 플래그 초기화 (closeCamera가 완료되면 다음 openCamera 호출 시 재시작을 위해)
+     isComparingFace = false; 
+     isProcessing = false;
+}
+
+// 페이지 로드 시 초기화 및 카메라 자동 실행
+function init() {
+    console.log("Page initialized.");
+
+    // 결과 팝업 닫기 버튼 이벤트 리스너 연결
+    popupCloseButton.addEventListener('click', hideResultPopup);
+
+    // 페이지 로드 시 자동으로 카메라 열기 시도
+    openCamera();
+}
+
+// DOMContentLoaded 이벤트 발생 시 init 함수 호출
+window.addEventListener('DOMContentLoaded', init);
+
+// 페이지를 벗어나거나 닫을 때 카메라 스트림 중지
+window.addEventListener('beforeunload', closeCamera);
+
+ // 비디오 요소 자체에서 발생하는 오류 처리 (스트림 끊김 등)
+ // cameraView가 null이 아닐 때만 이벤트 리스너 추가
+ if (cameraView) {
+      cameraView.addEventListener('error', (event) => {
+          console.error('Video element error:', event);
+           if (errorStatusElement) { errorStatusElement.textContent = '비디오 오류 발생'; errorStatusElement.className = 'status-error'; }
+          closeCamera(); // 비디오 오류 발생 시 카메라 중지 시도
+      });
+
+      // 비디오 일시 정지/종료 이벤트
+      cameraView.addEventListener('pause', () => { console.log('Video paused.'); });
+      cameraView.addEventListener('ended', () => {
+           console.log('Video ended.');
+           closeCamera(); // 비디오가 자연스럽게 끝난 경우에도 중지
+      });
+ }
