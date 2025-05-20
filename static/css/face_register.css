@@ -34,71 +34,138 @@ body {
 
 header {
     text-align: center;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
 
 header h1 {
     color: var(--primary-color);
     margin-bottom: 10px;
+    font-size: 1.8rem;
 }
 
 header p {
     color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+/* Navigation styling */
+.navigation {
+    display: flex;
+    justify-content: center;
+    margin: 15px 0;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.nav-link {
+    padding: 10px;
+    color: var(--text-color);
+    text-decoration: none;
+    transition: background-color 0.3s;
+    font-size: 0.9rem;
+    flex: 1;
+    text-align: center;
+}
+
+.nav-link:hover {
+    background-color: #e0e0e0;
+}
+
+.nav-link.active {
+    background-color: var(--primary-color);
+    color: white;
 }
 
 main {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 20px;
 }
 
 .capture-section, .results-section {
-    flex: 1;
-    min-width: 300px;
     background-color: white;
     border-radius: 8px;
-    padding: 20px;
+    padding: 15px;
     box-shadow: var(--shadow);
 }
 
 .capture-section h2, .results-section h2 {
     color: var(--primary-dark);
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 10px;
+    padding-bottom: 8px;
+    font-size: 1.3rem;
 }
 
+/* 웹캠 컨테이너 스타일 개선 */
 .webcam-container {
     width: 100%;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     position: relative;
+    aspect-ratio: 4/3;
+    background-color: #000;
+    overflow: hidden;
+    border-radius: 8px;
 }
 
-#webcam, #canvas, .capture-preview {
+#webcam, #canvas {
     width: 100%;
-    height: 300px;
+    height: 100%;
     border-radius: 4px;
-    background-color: #f2f2f2;
     object-fit: cover;
+    transform: scaleX(-1); /* 전면 카메라 미러링 */
 }
 
+/* 캡처 프리뷰 스타일 개선 */
 .capture-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    background-color: #000;
+    z-index: 2;
 }
 
-.capture-preview img {
+#capturedImage {
     max-width: 100%;
     max-height: 100%;
+    object-fit: contain;
+}
+
+/* 얼굴 감지 오버레이 */
+.face-detection-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* 얼굴 가이드 메시지 */
+.face-guidance-message {
+    text-align: center;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    color: var(--secondary-color);
+    padding: 5px;
+    border-radius: 4px;
+    background-color: rgba(0,0,0,0.05);
 }
 
 .camera-controls {
     display: flex;
     justify-content: center;
     gap: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
 }
 
 .primary-btn, .secondary-btn, .success-btn, .danger-btn {
@@ -108,6 +175,27 @@ main {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+/* 촬영 버튼 스타일 개선 */
+.capture-btn {
+    background-color: var(--danger-color);
+    position: relative;
+    padding-left: 35px;
+}
+
+.capture-btn::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    background-color: white;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.5);
 }
 
 .primary-btn {
@@ -152,13 +240,14 @@ button:disabled {
 }
 
 .person-info {
-    margin-top: 20px;
+    margin-top: 15px;
 }
 
 .person-info label {
     display: block;
     margin-bottom: 5px;
     font-weight: 500;
+    font-size: 0.9rem;
 }
 
 .person-info input {
@@ -166,18 +255,18 @@ button:disabled {
     padding: 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    margin-bottom: 15px;
-    font-size: 16px;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
 }
 
 .results-actions {
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 .results-list {
-    max-height: 500px;
+    max-height: 400px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -191,16 +280,18 @@ button:disabled {
 
 .face-card {
     display: flex;
-    padding: 15px;
+    padding: 10px;
     border-bottom: 1px solid var(--border-color);
-    gap: 15px;
+    gap: 10px;
+    align-items: center;
 }
 
 .face-image {
-    width: 100px;
-    height: 100px;
+    width: 60px;
+    height: 60px;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: 50%;
+    border: 2px solid var(--primary-color);
 }
 
 .face-info {
@@ -209,13 +300,14 @@ button:disabled {
 
 .face-name {
     font-weight: 700;
-    margin-bottom: 5px;
+    margin-bottom: 3px;
+    font-size: 0.9rem;
 }
 
 .face-details {
-    font-size: 13px;
+    font-size: 0.8rem;
     color: #666;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
 }
 
 .face-actions {
@@ -228,8 +320,8 @@ button:disabled {
     color: white;
     border: none;
     border-radius: 4px;
-    padding: 5px 10px;
-    font-size: 12px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
     cursor: pointer;
 }
 
@@ -238,11 +330,12 @@ button:disabled {
 }
 
 .status-bar {
-    margin-top: 20px;
+    margin-top: 15px;
     padding: 10px;
     background-color: var(--dark-bg);
     color: white;
     border-radius: 4px;
+    font-size: 0.9rem;
 }
 
 .success {
@@ -259,8 +352,8 @@ button:disabled {
 
 .spinner {
     display: inline-block;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     margin-left: 10px;
     border: 3px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
@@ -295,7 +388,7 @@ button:disabled {
     margin: 10% auto;
     padding: 20px;
     border-radius: 8px;
-    max-width: 500px;
+    max-width: 90%;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -333,167 +426,87 @@ button:disabled {
     margin-bottom: 10px;
 }
 
-/* 향상된 웹캠 프리뷰 스타일 */
-.enhanced-preview {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 4px;
+/* 모바일 최적화 스타일 */
+.mobile-optimized .webcam-container {
+    border-radius: 0;
+    margin: -15px;
+    width: calc(100% + 30px);
+    margin-bottom: 15px;
 }
 
-.webcam-container {
+.mobile-optimized .camera-controls {
     position: relative;
-    width: 100%;
-    height: 300px;
-    margin-bottom: 20px;
-    overflow: hidden;
-    border-radius: 4px;
-    background-color: #f2f2f2;
+    z-index: 5;
 }
 
-#webcam {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-/* 캡처된 이미지 프리뷰 스타일 향상 */
-.capture-preview {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.mobile-optimized .capture-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #f2f2f2;
-    border-radius: 4px;
-}
-
-#capturedImage {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-}
-
-/* 촬영 버튼 스타일 향상 */
-#captureBtn {
-    background-color: #e74c3c;
     position: relative;
-    padding-left: 30px;
 }
 
-#captureBtn::before {
+.mobile-optimized .capture-btn::before {
     content: "";
     position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 12px;
-    height: 12px;
-    background-color: white;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.3);
+    box-sizing: border-box;
 }
 
-#captureBtn:hover {
-    background-color: #c0392b;
-}
-
-/* 처리 중 상태 표시 향상 */
-.processing-indicator {
+.mobile-optimized .capture-btn::after {
+    content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-    border-radius: 4px;
-}
-
-.processing-indicator .spinner {
-    width: 40px;
-    height: 40px;
-    border-width: 4px;
-}
-
-/* 출퇴근 기록 관련 스타일 */
-.attendance-success {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    color: white;
-    font-size: 24px;
-    text-align: center;
-    transition: opacity 0.5s;
-}
-
-.attendance-icon {
-    font-size: 60px;
-    margin-bottom: 20px;
-    color: var(--success-color);
-}
-
-.attendance-name {
-    font-size: 36px;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
-
-.attendance-time {
-    font-size: 20px;
-    margin-bottom: 20px;
-}
-
-.attendance-tag {
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-weight: bold;
-    margin-top: 10px;
-}
-
-.tag-clock-in {
-    background-color: var(--success-color);
-}
-
-.tag-late {
-    background-color: var(--warning-color);
-}
-
-.tag-clock-out {
-    background-color: var(--primary-color);
-}
-
-.tag-none {
-    background-color: var(--secondary-color);
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background-color: white;
 }
 
 /* 반응형 스타일 */
-@media (max-width: 768px) {
+@media (min-width: 768px) {
     main {
-        flex-direction: column;
+        flex-direction: row;
     }
     
     .capture-section, .results-section {
-        width: 100%;
+        flex: 1;
+        min-width: 300px;
     }
     
     .camera-controls {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+    }
+}
+
+@media (max-width: 767px) {
+    .container {
+        padding: 10px;
+    }
+    
+    header {
+        margin-bottom: 15px;
+    }
+    
+    header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .camera-controls {
+        margin-bottom: 10px;
+    }
+    
+    .webcam-container {
+        margin-bottom: 10px;
+    }
+    
+    .results-section {
+        margin-top: 10px;
     }
 }

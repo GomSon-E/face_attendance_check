@@ -22,14 +22,19 @@ $(document).ready(function() {
     // 변수 설정
     let stream = null;
     let capturedImageData = null;
-    let rawImageData = null;  // 원본 이미지 데이터
     const API_URL = window.location.origin;
     
     // 카메라 시작 함수
     function startCamera() {
         updateStatus('카메라 접근 요청 중...', 'info');
         
-        // 웹캠 활성화
+        // 기존 스트림이 있으면 중지
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        
+        // 웹캠 활성화 - 모바일 환경에 적합한 설정 추가
         navigator.mediaDevices.getUserMedia({ 
             video: { 
                 width: { ideal: 1280 },
@@ -53,14 +58,18 @@ $(document).ready(function() {
             // 버튼 표시/숨김
             $retakeBtn.addClass('hidden');
             
-            // 실시간 이미지 향상 처리 시작
-            startImageEnhancement();
-            
             updateStatus('카메라가 활성화되었습니다. 사진을 촬영하세요.', 'success');
         })
         .catch(function(error) {
             console.error('카메라 접근 오류:', error);
             updateStatus(`카메라 접근 오류: ${error.message}`, 'error');
+            
+            // 모바일 환경에서 더 명확한 오류 메시지
+            if (error.name === 'NotAllowedError') {
+                updateStatus('카메라 접근 권한이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.', 'error');
+            } else if (error.name === 'NotFoundError') {
+                updateStatus('카메라를 찾을 수 없습니다. 기기에 카메라가 있는지 확인해주세요.', 'error');
+            }
         });
     }
     
@@ -79,69 +88,7 @@ $(document).ready(function() {
         }
     }
     
-    // 실시간 이미지 향상 처리
-    function startImageEnhancement() {
-        if (!stream) return;
-        
-        const video = $webcam[0];
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        
-        // 향상된 이미지를 화면에 표시하는 함수
-        function processFrame() {
-            if (!stream) return;  // 스트림이 없으면 처리하지 않음
-            
-            const width = video.videoWidth;
-            const height = video.videoHeight;
-            
-            // 비디오 프레임을 캔버스에 그리기
-            if (width && height) {
-                canvas.width = width;
-                canvas.height = height;
-                context.drawImage(video, 0, 0, width, height);
-                
-                // 이미지 데이터 가져오기
-                const imageData = context.getImageData(0, 0, width, height);
-                
-                // 이미지 향상 (밝기와 대비 조정)
-                enhanceImageData(imageData);
-                
-                // 향상된 이미지 데이터를 다시 캔버스에 그리기
-                context.putImageData(imageData, 0, 0);
-                
-                // 비디오 요소 대신 캔버스를 화면에 표시
-                video.style.display = 'none';
-                if (!canvas.parentNode) {
-                    // 캔버스가 아직 DOM에 추가되지 않았다면 추가
-                    $(canvas).addClass('enhanced-preview');
-                    $(video).after(canvas);
-                }
-            }
-            
-            // 다음 프레임 처리
-            requestAnimationFrame(processFrame);
-        }
-        
-        // 향상된 이미지 처리 시작
-        processFrame();
-    }
-    
-    // 이미지 데이터 향상 함수 (밝기와 대비 조정)
-    function enhanceImageData(imageData) {
-        const data = imageData.data;
-        const alpha = 1.5;  // 대비 (1.0 = 원본)
-        const beta = 30;    // 밝기 (-255 ~ 255)
-        
-        for (let i = 0; i < data.length; i += 4) {
-            // 빨강, 초록, 파랑 채널에 대해 대비와 밝기 조정
-            data[i] = Math.min(255, Math.max(0, alpha * data[i] + beta));
-            data[i+1] = Math.min(255, Math.max(0, alpha * data[i+1] + beta));
-            data[i+2] = Math.min(255, Math.max(0, alpha * data[i+2] + beta));
-            // 알파 채널은 변경하지 않음 (data[i+3])
-        }
-    }
-    
-    // 사진 촬영 함수
+    // 사진 촬영 함수 - 좌우반전 적용
     function captureImage() {
         if (!stream) {
             updateStatus('카메라가 활성화되지 않았습니다.', 'error');
@@ -157,24 +104,22 @@ $(document).ready(function() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
-        // 비디오 프레임을 캔버스에 그리기
+        // 좌우반전 적용 - video 요소가 transform: scaleX(-1)로 표시되므로 실제 캡처 시에도 반전 적용
+        context.translate(canvas.width, 0);
+        context.scale(-1, 1);
+        
+        // 비디오 프레임을 캔버스에 그리기 (좌우반전 상태로)
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        // 원본 이미지 데이터 저장
-        rawImageData = canvas.toDataURL('image/jpeg');
+        // 캔버스 변환 상태 초기화 (필요시 추가 그리기를 위해)
+        context.setTransform(1, 0, 0, 1, 0, 0);
         
-        // 향상된 이미지 처리
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        enhanceImageData(imageData);
-        context.putImageData(imageData, 0, 0);
-        
-        // 향상된 이미지 데이터 저장
+        // 이미지 데이터 저장 (좌우반전된 상태로)
         capturedImageData = canvas.toDataURL('image/jpeg');
         
-        // 미리보기 설정 (향상된 이미지 표시)
+        // 미리보기 설정
         $capturedImage.attr('src', capturedImageData);
         $webcam.addClass('hidden');
-        $('.enhanced-preview').addClass('hidden');  // 향상된 비디오 미리보기 숨기기
         $capturePreview.removeClass('hidden');
         
         // 버튼 상태 변경
@@ -194,11 +139,9 @@ $(document).ready(function() {
         
         // 프리뷰 초기화
         $webcam.removeClass('hidden');
-        $('.enhanced-preview').removeClass('hidden');  // 향상된 비디오 미리보기 표시
         $capturePreview.addClass('hidden');
         $capturedImage.attr('src', '');
         capturedImageData = null;
-        rawImageData = null;
         
         // 버튼 상태 변경
         $captureBtn.prop('disabled', false);
@@ -228,12 +171,17 @@ $(document).ready(function() {
         updateStatus('얼굴 특징 벡터 추출 중...', 'info');
         
         // API 요청 데이터 준비
-        const requestData = {
+        let requestData = {
             name: name,
-            image: capturedImageData  // 향상된 이미지 데이터 사용
+            image: capturedImageData
         };
         
-        // API 요청
+        // API 요청 전송
+        sendApiRequest(requestData);
+    }
+    
+    // API 요청 전송 함수
+    function sendApiRequest(requestData) {
         $.ajax({
             url: `${API_URL}/api/capture-face`,
             type: 'POST',
@@ -284,11 +232,9 @@ $(document).ready(function() {
     function resetInputs() {
         $personName.val('');
         capturedImageData = null;
-        rawImageData = null;
         $capturedImage.attr('src', '');
         $capturePreview.addClass('hidden');
         $webcam.removeClass('hidden');
-        $('.enhanced-preview').removeClass('hidden');  // 향상된 비디오 미리보기 표시
         $retakeBtn.addClass('hidden');
         $saveBtn.prop('disabled', true);
         $captureBtn.prop('disabled', false);
@@ -395,38 +341,76 @@ $(document).ready(function() {
         });
     }
     
+    // 모바일 기기 감지 함수
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+    
     // 이벤트 리스너 설정
-    $startCameraBtn.on('click', function() {
-        if (stream) {
-            stopCamera();
-        } else {
-            startCamera();
-        }
-    });
-    
-    $captureBtn.on('click', captureImage);
-    $retakeBtn.on('click', retake);
-    $saveBtn.on('click', saveFeatureVector);
-    $refreshButton.on('click', loadFacesList);
-    
-    // 모달 닫기
-    $closeModal.on('click', function() {
-        $modal.css('display', 'none');
-    });
-    
-    $(window).on('click', function(event) {
-        if (event.target === $modal[0]) {
+    function setupEventListeners() {
+        // 카메라 시작/중지 버튼
+        $startCameraBtn.on('click', function() {
+            if (stream) {
+                stopCamera();
+            } else {
+                startCamera();
+            }
+        });
+        
+        // 촬영 및 관련 버튼
+        $captureBtn.on('click', captureImage);
+        $retakeBtn.on('click', retake);
+        $saveBtn.on('click', saveFeatureVector);
+        $refreshButton.on('click', loadFacesList);
+        
+        // 모달 닫기
+        $closeModal.on('click', function() {
             $modal.css('display', 'none');
-        }
-    });
-    
-    // 동적으로 생성된 삭제 버튼에 대한 이벤트 위임
-    $resultsList.on('click', '.delete-button', function() {
-        const faceId = $(this).data('id');
-        deleteFace(faceId);
-    });
+        });
+        
+        // 모달 외부 클릭 시 닫기
+        $(window).on('click', function(event) {
+            if (event.target === $modal[0]) {
+                $modal.css('display', 'none');
+            }
+        });
+        
+        // 동적으로 생성된 삭제 버튼에 대한 이벤트 위임
+        $resultsList.on('click', '.delete-button', function() {
+            const faceId = $(this).data('id');
+            deleteFace(faceId);
+        });
+        
+        // 모바일 환경에서 가로/세로 방향 변경 시 카메라 재조정
+        window.addEventListener('orientationchange', function() {
+            if (stream) {
+                // 간단히 비디오 요소를 리셋해서 새 방향에 맞게 조정
+                const currentDisplay = $webcam.css('display');
+                $webcam.css('display', 'none');
+                setTimeout(function() {
+                    $webcam.css('display', currentDisplay);
+                }, 100);
+            }
+        });
+    }
     
     // 페이지 로드 시 실행
-    updateStatus('준비 완료. 카메라 시작 버튼을 눌러 시작하세요.', 'info');
-    loadFacesList();
+    function init() {
+        setupEventListeners();
+        
+        // 모바일 기기 여부 감지 및 UI 최적화
+        if (isMobileDevice()) {
+            // 모바일에 최적화된 UI 설정
+            $('.container').addClass('mobile-optimized');
+            
+            // iOS Safari에서 비디오 자동 재생 속성 추가
+            $webcam.attr('playsinline', ''); 
+        }
+        
+        updateStatus('준비 완료. 카메라 시작 버튼을 눌러 시작하세요.', 'info');
+        loadFacesList();
+    }
+    
+    // 초기화 함수 호출
+    init();
 });
