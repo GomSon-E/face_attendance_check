@@ -387,7 +387,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         matches = sorted(matches, key=lambda x: x["confidence"], reverse=True)
         
         # 유사도가 일정 수준 이상인 얼굴만 필터링
-        threshold = 0.4  # 40% 이상의 유사도를 가진 얼굴만 반환
+        threshold = 0.6  # 60% 이상의 유사도를 가진 얼굴만 반환
         filtered_matches = [match for match in matches if match["confidence"] >= threshold]
         
         return {
