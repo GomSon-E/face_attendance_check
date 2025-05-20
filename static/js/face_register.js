@@ -14,10 +14,6 @@ $(document).ready(function() {
     const $refreshButton = $('#refreshButton');
     const $resultsList = $('#resultsList');
     const $statusMessage = $('#statusMessage');
-    const $modal = $('#modal');
-    const $modalTitle = $('#modalTitle');
-    const $modalBody = $('#modalBody');
-    const $closeModal = $('.close');
     
     // 변수 설정
     let stream = null;
@@ -64,7 +60,6 @@ $(document).ready(function() {
             console.error('카메라 접근 오류:', error);
             updateStatus(`카메라 접근 오류: ${error.message}`, 'error');
             
-            // 모바일 환경에서 더 명확한 오류 메시지
             if (error.name === 'NotAllowedError') {
                 updateStatus('카메라 접근 권한이 거부되었습니다. 브라우저 설정에서 카메라 권한을 허용해주세요.', 'error');
             } else if (error.name === 'NotFoundError') {
@@ -88,34 +83,69 @@ $(document).ready(function() {
         }
     }
     
-    // 사진 촬영 함수 - 좌우반전 적용
+    // 사진 촬영 함수 (화면에 보이는 영역만 캡처)
     function captureImage() {
         if (!stream) {
             updateStatus('카메라가 활성화되지 않았습니다.', 'error');
             return;
         }
         
-        // 캔버스 설정
+        // 비디오 요소 참조
         const video = $webcam[0];
+        
+        // 캔버스 참조
         const canvas = $canvas[0];
         const context = canvas.getContext('2d');
         
-        // 비디오 크기에 맞게 캔버스 설정
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        // 화면에 표시되는 비디오의 실제 크기 계산
+        const videoElement = $webcam[0];
+        const displayWidth = videoElement.offsetWidth;
+        const displayHeight = videoElement.offsetHeight;
         
-        // 좌우반전 적용 - video 요소가 transform: scaleX(-1)로 표시되므로 실제 캡처 시에도 반전 적용
+        // 캔버스 크기를 디스플레이 크기와 동일하게 설정
+        canvas.width = displayWidth;
+        canvas.height = displayHeight;
+        
+        // 비디오의 원본 크기
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        
+        // 비디오가 화면에 표시되는 비율 계산
+        let sourceX = 0;
+        let sourceY = 0;
+        let sourceWidth = videoWidth;
+        let sourceHeight = videoHeight;
+        
+        // 비디오와 화면의 비율 비교
+        const videoRatio = videoWidth / videoHeight;
+        const displayRatio = displayWidth / displayHeight;
+        
+        if (videoRatio > displayRatio) {
+            // 비디오가 더 넓은 경우, 높이를 맞추고 너비를 자름
+            sourceWidth = videoHeight * displayRatio;
+            sourceX = (videoWidth - sourceWidth) / 2;
+        } else {
+            // 비디오가 더 높은 경우, 너비를 맞추고 높이를 자름
+            sourceHeight = videoWidth / displayRatio;
+            sourceY = (videoHeight - sourceHeight) / 2;
+        }
+        
+        // 좌우반전을 위한 변환
         context.translate(canvas.width, 0);
         context.scale(-1, 1);
         
-        // 비디오 프레임을 캔버스에 그리기 (좌우반전 상태로)
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // 계산된 영역에 맞게 비디오를 캔버스에 그림
+        context.drawImage(
+            video,
+            sourceX, sourceY, sourceWidth, sourceHeight,  // 소스 영역
+            0, 0, canvas.width, canvas.height             // 캔버스 크기에 맞춤
+        );
         
-        // 캔버스 변환 상태 초기화 (필요시 추가 그리기를 위해)
+        // 캔버스 변환 상태 초기화
         context.setTransform(1, 0, 0, 1, 0, 0);
         
-        // 이미지 데이터 저장 (좌우반전된 상태로)
-        capturedImageData = canvas.toDataURL('image/jpeg');
+        // 이미지 데이터 저장
+        capturedImageData = canvas.toDataURL('image/jpeg', 0.9);
         
         // 미리보기 설정
         $capturedImage.attr('src', capturedImageData);
@@ -189,14 +219,8 @@ $(document).ready(function() {
             data: JSON.stringify(requestData),
             success: function(response) {
                 updateStatus('특징 벡터가 성공적으로 추출되었습니다.', 'success');
-                
-                // 성공 모달 표시
-                showModal('추출 성공', `
-                    <p class="success-message">${response.message}</p>
-                    <p><strong>이름:</strong> ${response.name}</p>
-                    <p><strong>벡터 길이:</strong> ${response.vector_length}</p>
-                    <img src="data:image/jpeg;base64,${response.image_base64}" alt="${response.name}" class="result-image">
-                `);
+
+                alert('특징 벡터가 성공적으로 추출되었습니다.');
                 
                 // 입력 초기화
                 resetInputs();
@@ -213,12 +237,8 @@ $(document).ready(function() {
                 
                 console.error('Error:', error);
                 updateStatus(`오류: ${errorMsg}`, 'error');
-                
-                // 오류 모달 표시
-                showModal('추출 실패', `
-                    <p class="error-message">${errorMsg}</p>
-                    <p>다시 시도하거나 다른 사진을 촬영해보세요.</p>
-                `);
+
+                alert(`추출 실패: ${errorMsg}`);
             },
             complete: function() {
                 // 버튼 활성화 및 로딩 표시 제거
@@ -304,6 +324,26 @@ $(document).ready(function() {
         }
     }
     
+    // 웹캠 크기 조정 시 이벤트 처리
+    function onWebcamResize() {
+        // 웹캠 컨테이너의 크기가 변경되면 캔버스 크기도 업데이트
+        const $webcamContainer = $('.webcam-container');
+        if ($webcamContainer.length > 0) {
+            const containerWidth = $webcamContainer.width();
+            const containerHeight = $webcamContainer.height();
+            
+            // 디버깅 정보 출력
+            console.log(`웹캠 컨테이너 크기: ${containerWidth}x${containerHeight}`);
+            
+            // 비디오 요소의 스타일 설정
+            $webcam.css({
+                'width': '100%',
+                'height': '100%',
+                'object-fit': 'cover'
+            });
+        }
+    }
+    
     // 상태 메시지 업데이트 함수
     function updateStatus(message, type = 'info') {
         $statusMessage.text(message);
@@ -313,13 +353,6 @@ $(document).ready(function() {
         $('#statusBar').addClass(type);
         
         console.log(`[${type.toUpperCase()}] ${message}`);
-    }
-    
-    // 모달 표시 함수
-    function showModal(title, content) {
-        $modalTitle.text(title);
-        $modalBody.html(content);
-        $modal.css('display', 'block');
     }
     
     // 날짜 포맷팅 함수
@@ -363,35 +396,8 @@ $(document).ready(function() {
         $saveBtn.on('click', saveFeatureVector);
         $refreshButton.on('click', loadFacesList);
         
-        // 모달 닫기
-        $closeModal.on('click', function() {
-            $modal.css('display', 'none');
-        });
-        
-        // 모달 외부 클릭 시 닫기
-        $(window).on('click', function(event) {
-            if (event.target === $modal[0]) {
-                $modal.css('display', 'none');
-            }
-        });
-        
-        // 동적으로 생성된 삭제 버튼에 대한 이벤트 위임
-        $resultsList.on('click', '.delete-button', function() {
-            const faceId = $(this).data('id');
-            deleteFace(faceId);
-        });
-        
-        // 모바일 환경에서 가로/세로 방향 변경 시 카메라 재조정
-        window.addEventListener('orientationchange', function() {
-            if (stream) {
-                // 간단히 비디오 요소를 리셋해서 새 방향에 맞게 조정
-                const currentDisplay = $webcam.css('display');
-                $webcam.css('display', 'none');
-                setTimeout(function() {
-                    $webcam.css('display', currentDisplay);
-                }, 100);
-            }
-        });
+        // 웹캠 컨테이너 크기 변경 감지
+        $(window).on('resize', onWebcamResize);
     }
     
     // 페이지 로드 시 실행
@@ -402,10 +408,11 @@ $(document).ready(function() {
         if (isMobileDevice()) {
             // 모바일에 최적화된 UI 설정
             $('.container').addClass('mobile-optimized');
-            
-            // iOS Safari에서 비디오 자동 재생 속성 추가
-            $webcam.attr('playsinline', ''); 
+        
         }
+        
+        // 웹캠 컨테이너 크기 초기화
+        onWebcamResize();
         
         updateStatus('준비 완료. 카메라 시작 버튼을 눌러 시작하세요.', 'info');
         loadFacesList();
