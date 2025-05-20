@@ -7,18 +7,121 @@ $(document).ready(function() {
     const $capturedImage = $('#capturedImage');
     const $startCameraBtn = $('#startCameraBtn');
     const $captureBtn = $('#captureBtn');
-    const $retakeBtn = $('#retakeBtn');
     const $personName = $('#personName');
+    const $personDepartment = $('#personDepartment');
+    const $personPosition = $('#personPosition');
+    const $personEmployeeId = $('#personEmployeeId');
     const $saveBtn = $('#saveBtn');
+    const $resetBtn = $('#resetBtn');
     const $spinner = $('#spinner');
-    const $refreshButton = $('#refreshButton');
-    const $resultsList = $('#resultsList');
     const $statusMessage = $('#statusMessage');
+    const $capturedCount = $('#capturedCount');
     
     // 변수 설정
     let stream = null;
-    let capturedImageData = null;
+    let capturedImages = [null, null, null, null, null]; // 5장의 이미지를 저장할 배열
+    let currentImageCount = 0; // 현재 촬영된 이미지 수
+    let nextImageIndex = 0; // 다음 이미지를 저장할 인덱스
+    const MAX_IMAGES = 5; // 최대 이미지 수
     const API_URL = window.location.origin;
+    
+    // 이미지 미리보기 아이템 초기화
+    function initImagePreviews() {
+        // 각 미리보기 아이템의 삭제 버튼에 이벤트 리스너 추가
+        $('.delete-preview-btn').each(function() {
+            $(this).on('click', function(e) {
+                e.stopPropagation(); // 이벤트 버블링 방지
+                const index = $(this).data('index');
+                deleteImage(index);
+            });
+        });
+    }
+    
+    // 이미지 업데이트 함수 (촬영된 이미지를 특정 슬롯에 표시)
+    function updateImagePreview(index, imageData) {
+        const $previewItem = $(`.image-preview-item[data-index="${index}"]`);
+        
+        // 이미지 요소가 없으면 생성
+        if ($previewItem.find('img').length === 0) {
+            $previewItem.append('<img src="" alt="촬영된 이미지">');
+        }
+        
+        // 이미지 소스 설정
+        $previewItem.find('img').attr('src', imageData);
+        
+        // 클래스 추가하여 스타일 변경
+        $previewItem.addClass('has-image');
+        
+        // 이미지 카운트 업데이트 - 여기서는 호출하지 않고 captureImage에서 직접 호출
+        // updateImageCount() 함수를 여기서 호출하지 않음
+        
+        console.log("이미지 미리보기 업데이트 완료:", index);
+    }
+    
+    // 이미지 삭제 함수
+    function deleteImage(index) {
+        if (capturedImages[index] !== null) {
+            // 배열에서 해당 인덱스의 이미지 데이터 제거
+            capturedImages[index] = null;
+            
+            // UI에서 이미지 제거
+            const $previewItem = $(`.image-preview-item[data-index="${index}"]`);
+            $previewItem.removeClass('has-image');
+            $previewItem.find('img').remove();
+            
+            // 이미지 카운트 감소
+            currentImageCount--;
+            
+            // 카운트 표시 직접 업데이트
+            $capturedCount.text(currentImageCount);
+            
+            // 디버깅 로그
+            console.log(`이미지 삭제 완료: 현재 카운트 = ${currentImageCount}`, $capturedCount.text());
+            
+            // 삭제된 인덱스가 nextImageIndex보다 작으면 nextImageIndex 업데이트
+            if (nextImageIndex > index || nextImageIndex >= MAX_IMAGES) {
+                nextImageIndex = index;
+            }
+            
+            // 저장 버튼 상태 업데이트
+            updateSaveButtonState();
+            
+            updateStatus(`이미지 ${index + 1}이(가) 삭제되었습니다.`, 'info');
+        }
+    }
+    
+    // 이미지 카운트 업데이트 함수 - 이제 더 이상 사용하지 않습니다.
+    // 직접 $capturedCount.text(currentImageCount)로 업데이트합니다.
+    function updateImageCount() {
+        // 현재 이미지 수를 화면에 표시
+        $capturedCount.text(currentImageCount);
+        console.log("이미지 카운트 업데이트 함수 호출됨:", currentImageCount, "화면 표시:", $capturedCount.text());
+        
+        // 저장 버튼 상태 업데이트
+        updateSaveButtonState();
+    }
+    
+    // 다음 사용 가능한 이미지 슬롯 찾기
+    function findNextImageSlot() {
+        // 현재 인덱스부터 시작해서 비어있는 슬롯 찾기
+        for (let i = 0; i < MAX_IMAGES; i++) {
+            if (capturedImages[i] === null) {
+                return i;
+            }
+        }
+        // 모든 슬롯이 차있으면 0번 슬롯 반환 (덮어쓰기)
+        return 0;
+    }
+    
+    // 저장 버튼 상태 업데이트
+    function updateSaveButtonState() {
+        // 5장의 이미지가 촬영되고 이름이 입력된 경우 저장 버튼 활성화
+        if (currentImageCount >= 5 && $personName.val().trim() !== '') {
+            $saveBtn.prop('disabled', false);
+        } else {
+            $saveBtn.prop('disabled', true);
+        }
+    }
     
     // 카메라 시작 함수
     function startCamera() {
@@ -50,9 +153,6 @@ $(document).ready(function() {
             $webcam.removeClass('hidden');
             $capturePreview.addClass('hidden');
             $capturedImage.attr('src', '');
-            
-            // 버튼 표시/숨김
-            $retakeBtn.addClass('hidden');
             
             updateStatus('카메라가 활성화되었습니다. 사진을 촬영하세요.', 'success');
         })
@@ -87,6 +187,12 @@ $(document).ready(function() {
     function captureImage() {
         if (!stream) {
             updateStatus('카메라가 활성화되지 않았습니다.', 'error');
+            return;
+        }
+        
+        // 최대 이미지 수 확인
+        if (currentImageCount >= MAX_IMAGES) {
+            updateStatus('이미 최대 수량인 5장의 이미지가 촬영되었습니다. 불필요한 이미지를 삭제하고 다시 시도하세요.', 'warning');
             return;
         }
         
@@ -144,54 +250,96 @@ $(document).ready(function() {
         // 캔버스 변환 상태 초기화
         context.setTransform(1, 0, 0, 1, 0, 0);
         
-        // 이미지 데이터 저장
-        capturedImageData = canvas.toDataURL('image/jpeg', 0.9);
+        // 이미지 데이터 추출
+        const imageData = canvas.toDataURL('image/jpeg', 0.9);
         
-        // 미리보기 설정
-        $capturedImage.attr('src', capturedImageData);
+        // 다음 사용 가능한 슬롯 찾기
+        nextImageIndex = findNextImageSlot();
+        
+        // 이미지 데이터 저장
+        capturedImages[nextImageIndex] = imageData;
+        
+        // 이미지 카운트 증가
+        currentImageCount++;
+        
+        // 이미지 미리보기 업데이트
+        updateImagePreview(nextImageIndex, imageData);
+        
+        // 카운트 표시 직접 업데이트
+        $capturedCount.text(currentImageCount);
+        
+        // 저장 버튼 상태 업데이트
+        updateSaveButtonState();
+        
+        // 디버깅 로그
+        console.log(`이미지 캡처 완료: 현재 카운트 = ${currentImageCount}`, $capturedCount.text());
+        
+        // 이미지 캡처 및 저장 완료 메시지
+        updateStatus(`이미지 ${nextImageIndex + 1}이(가) 촬영되었습니다. (${currentImageCount}/${MAX_IMAGES})`, 'success');
+        
+        // 미리보기 잠시 표시 후 숨기기
+        $capturedImage.attr('src', imageData);
         $webcam.addClass('hidden');
         $capturePreview.removeClass('hidden');
         
-        // 버튼 상태 변경
-        $captureBtn.prop('disabled', true);
-        $retakeBtn.removeClass('hidden');
-        $saveBtn.prop('disabled', false);
-        
-        updateStatus('사진이 촬영되었습니다. 특징 벡터를 추출하려면 이름을 입력하고 저장 버튼을 누르세요.', 'success');
+        // 1초 후 다시 카메라 표시
+        setTimeout(function() {
+            $webcam.removeClass('hidden');
+            $capturePreview.addClass('hidden');
+        }, 1000);
     }
     
-    // 다시 촬영 함수
-    function retake() {
-        if (!stream) {
-            startCamera();
-            return;
-        }
+    // 모든 입력 초기화 함수
+    function resetForm() {
+        // 입력 필드 초기화
+        $personName.val('');
+        $personDepartment.val('');
+        $personPosition.val('');
+        $personEmployeeId.val('');
         
-        // 프리뷰 초기화
-        $webcam.removeClass('hidden');
-        $capturePreview.addClass('hidden');
-        $capturedImage.attr('src', '');
-        capturedImageData = null;
+        // 이미지 데이터 및 미리보기 초기화
+        capturedImages = [null, null, null, null, null];
+        currentImageCount = 0;
+        nextImageIndex = 0;
         
-        // 버튼 상태 변경
-        $captureBtn.prop('disabled', false);
-        $retakeBtn.addClass('hidden');
+        // 미리보기 UI 초기화
+        $('.image-preview-item').each(function() {
+            $(this).removeClass('has-image');
+            $(this).find('img').remove();
+        });
+        
+        // 카운트 표시 직접 업데이트
+        $capturedCount.text('0');
+        console.log("폼 초기화: 카운트 리셋됨");
+        
+        // 버튼 상태 업데이트
         $saveBtn.prop('disabled', true);
         
-        updateStatus('다시 촬영합니다.', 'info');
+        updateStatus('모든 입력이 초기화되었습니다.', 'info');
     }
     
     // 특징 벡터 추출 및 저장 함수
-    function saveFeatureVector() {
+    function saveFeatureVectors() {
         const name = $personName.val().trim();
+        const department = $personDepartment.val().trim();
+        const position = $personPosition.val().trim();
+        const employeeId = $personEmployeeId.val().trim();
         
         if (!name) {
             updateStatus('인물 이름을 입력해주세요.', 'error');
             return;
         }
         
-        if (!capturedImageData) {
-            updateStatus('먼저 사진을 촬영해주세요.', 'error');
+        if (currentImageCount === 0) {
+            updateStatus('최소 한 장 이상의 사진을 촬영해주세요.', 'error');
+            return;
+        }
+        
+        // 유효한 이미지만 필터링
+        const validImages = capturedImages.filter(img => img !== null);
+        
+        if (validImages.length === 0) {
+            updateStatus('유효한 이미지가 없습니다.', 'error');
             return;
         }
         
@@ -200,33 +348,58 @@ $(document).ready(function() {
         $spinner.removeClass('hidden');
         updateStatus('얼굴 특징 벡터 추출 중...', 'info');
         
-        // API 요청 데이터 준비
-        let requestData = {
+        // 순차적으로 모든 이미지 처리 (첫 번째 이미지부터 시작)
+        processNextImage(0, validImages, {
             name: name,
-            image: capturedImageData
+            department: department,
+            position: position,
+            employeeId: employeeId
+        });
+    }
+    
+    // 순차적으로 이미지를 처리하는 재귀 함수
+    function processNextImage(index, images, userData) {
+        // 모든 이미지 처리 완료
+        if (index >= images.length) {
+            updateStatus(`${userData.name}의 얼굴 특징 벡터가 성공적으로 추출되어 저장되었습니다.`, 'success');
+            
+            // 버튼 활성화 및 로딩 표시 제거
+            $saveBtn.prop('disabled', false);
+            $spinner.addClass('hidden');
+            
+            // 사용자에게 완료 알림
+            alert(`${userData.name}의 얼굴 특징 벡터가 성공적으로 추출되어 저장되었습니다. (${images.length}장의 이미지 처리 완료)`);
+            
+            // 입력 초기화
+            resetForm();
+            return;
+        }
+        
+        // 현재 이미지에 대한 API 요청 데이터 준비
+        const requestData = {
+            name: userData.name,
+            image: images[index],
+            metadata: {
+                department: userData.department,
+                position: userData.position,
+                employeeId: userData.employeeId,
+                imageIndex: index + 1,
+                totalImages: images.length
+            }
         };
         
         // API 요청 전송
-        sendApiRequest(requestData);
-    }
-    
-    // API 요청 전송 함수
-    function sendApiRequest(requestData) {
         $.ajax({
             url: `${API_URL}/api/capture-face`,
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(requestData),
             success: function(response) {
-                updateStatus('특징 벡터가 성공적으로 추출되었습니다.', 'success');
-
-                alert('특징 벡터가 성공적으로 추출되었습니다.');
+                console.log(`이미지 ${index + 1}/${images.length} 처리 완료:`, response);
+                updateStatus(`이미지 ${index + 1}/${images.length} 처리 완료`, 'info');
                 
-                // 입력 초기화
-                resetInputs();
-                
-                // 결과 목록 새로고침
-                loadFacesList();
+                // 다음 이미지 처리
+                processNextImage(index + 1, images, userData);
             },
             error: function(xhr, status, error) {
                 let errorMsg = '요청 처리 중 오류가 발생했습니다.';
@@ -235,113 +408,17 @@ $(document).ready(function() {
                     errorMsg = xhr.responseJSON.detail;
                 }
                 
-                console.error('Error:', error);
-                updateStatus(`오류: ${errorMsg}`, 'error');
-
-                alert(`추출 실패: ${errorMsg}`);
-            },
-            complete: function() {
+                console.error(`이미지 ${index + 1} 처리 중 오류:`, error);
+                updateStatus(`이미지 ${index + 1} 처리 중 오류: ${errorMsg}`, 'error');
+                
+                // 사용자에게 오류 알림
+                alert(`이미지 ${index + 1} 처리 중 오류: ${errorMsg}`);
+                
                 // 버튼 활성화 및 로딩 표시 제거
                 $saveBtn.prop('disabled', false);
                 $spinner.addClass('hidden');
             }
         });
-    }
-    
-    // 입력 초기화 함수
-    function resetInputs() {
-        $personName.val('');
-        capturedImageData = null;
-        $capturedImage.attr('src', '');
-        $capturePreview.addClass('hidden');
-        $webcam.removeClass('hidden');
-        $retakeBtn.addClass('hidden');
-        $saveBtn.prop('disabled', true);
-        $captureBtn.prop('disabled', false);
-    }
-    
-    // 얼굴 목록 불러오기 함수
-    function loadFacesList() {
-        updateStatus('저장된 얼굴 목록을 불러오는 중...', 'info');
-        
-        $.ajax({
-            url: `${API_URL}/api/faces`,
-            type: 'GET',
-            success: function(data) {
-                if (data.faces && data.faces.length > 0) {
-                    $resultsList.empty();
-                    
-                    $.each(data.faces, function(i, face) {
-                        const faceCard = $(`
-                            <div class="face-card">
-                                <img src="data:image/jpeg;base64,${face.image_base64}" alt="${face.name}" class="face-image">
-                                <div class="face-info">
-                                    <div class="face-name">${face.name}</div>
-                                    <div class="face-details">
-                                        <div>등록일: ${formatDate(face.timestamp)}</div>
-                                    </div>
-                                    <div class="face-actions">
-                                        <button class="delete-button" data-id="${face.id}">삭제</button>
-                                    </div>
-                                </div>
-                            </div>
-                        `);
-                        
-                        $resultsList.append(faceCard);
-                    });
-                    
-                    updateStatus('얼굴 목록을 불러왔습니다.', 'success');
-                } else {
-                    $resultsList.html('<p class="no-results">저장된 얼굴이 없습니다.</p>');
-                    updateStatus('저장된 얼굴이 없습니다.', 'info');
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('Error fetching faces:', error);
-                $resultsList.html('<p class="no-results">얼굴 목록을 불러오는 데 실패했습니다.</p>');
-                updateStatus('얼굴 목록을 불러오는 데 실패했습니다.', 'error');
-            }
-        });
-    }
-    
-    // 얼굴 삭제 함수
-    function deleteFace(faceId) {
-        if (confirm('정말로 이 얼굴 데이터를 삭제하시겠습니까?')) {
-            updateStatus('얼굴 데이터 삭제 중...', 'info');
-            
-            $.ajax({
-                url: `${API_URL}/api/faces/${faceId}`,
-                type: 'DELETE',
-                success: function(data) {
-                    updateStatus('얼굴 데이터가 삭제되었습니다.', 'success');
-                    loadFacesList(); // 목록 새로고침
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error deleting face:', error);
-                    updateStatus('얼굴 데이터 삭제 중 오류가 발생했습니다.', 'error');
-                }
-            });
-        }
-    }
-    
-    // 웹캠 크기 조정 시 이벤트 처리
-    function onWebcamResize() {
-        // 웹캠 컨테이너의 크기가 변경되면 캔버스 크기도 업데이트
-        const $webcamContainer = $('.webcam-container');
-        if ($webcamContainer.length > 0) {
-            const containerWidth = $webcamContainer.width();
-            const containerHeight = $webcamContainer.height();
-            
-            // 디버깅 정보 출력
-            console.log(`웹캠 컨테이너 크기: ${containerWidth}x${containerHeight}`);
-            
-            // 비디오 요소의 스타일 설정
-            $webcam.css({
-                'width': '100%',
-                'height': '100%',
-                'object-fit': 'cover'
-            });
-        }
     }
     
     // 상태 메시지 업데이트 함수
@@ -355,28 +432,26 @@ $(document).ready(function() {
         console.log(`[${type.toUpperCase()}] ${message}`);
     }
     
-    // 날짜 포맷팅 함수
-    function formatDate(dateString) {
-        if (!dateString) return '';
-        
-        const date = new Date(dateString);
-        
-        if (isNaN(date.getTime())) {
-            return dateString; // 변환할 수 없는 경우 원본 반환
-        }
-        
-        return date.toLocaleString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
-    
     // 모바일 기기 감지 함수
     function isMobileDevice() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+    
+    // 웹캠 크기 조정 시 이벤트 처리
+    function onWebcamResize() {
+        // 웹캠 컨테이너의 크기가 변경되면 캔버스 크기도 업데이트
+        const $webcamContainer = $('.webcam-container');
+        if ($webcamContainer.length > 0) {
+            const containerWidth = $webcamContainer.width();
+            const containerHeight = $webcamContainer.height();
+            
+            // 비디오 요소의 스타일 설정
+            $webcam.css({
+                'width': '100%',
+                'height': '100%',
+                'object-fit': 'cover'
+            });
+        }
     }
     
     // 이벤트 리스너 설정
@@ -390,11 +465,17 @@ $(document).ready(function() {
             }
         });
         
-        // 촬영 및 관련 버튼
+        // 촬영 버튼
         $captureBtn.on('click', captureImage);
-        $retakeBtn.on('click', retake);
-        $saveBtn.on('click', saveFeatureVector);
-        $refreshButton.on('click', loadFacesList);
+        
+        // 저장 버튼
+        $saveBtn.on('click', saveFeatureVectors);
+        
+        // 초기화 버튼
+        $resetBtn.on('click', resetForm);
+        
+        // 이름 입력 시 저장 버튼 상태 업데이트
+        $personName.on('input', updateSaveButtonState);
         
         // 웹캠 컨테이너 크기 변경 감지
         $(window).on('resize', onWebcamResize);
@@ -402,20 +483,28 @@ $(document).ready(function() {
     
     // 페이지 로드 시 실행
     function init() {
+        // 이벤트 리스너 설정
         setupEventListeners();
+        
+        // 이미지 미리보기 초기화
+        initImagePreviews();
         
         // 모바일 기기 여부 감지 및 UI 최적화
         if (isMobileDevice()) {
             // 모바일에 최적화된 UI 설정
             $('.container').addClass('mobile-optimized');
-        
         }
         
         // 웹캠 컨테이너 크기 초기화
         onWebcamResize();
         
+        // 초기 상태 업데이트
         updateStatus('준비 완료. 카메라 시작 버튼을 눌러 시작하세요.', 'info');
-        loadFacesList();
+        
+        // 초기 이미지 카운트 표시 강제 설정
+        currentImageCount = 0;
+        $capturedCount.text('0');
+        updateSaveButtonState();
     }
     
     // 초기화 함수 호출

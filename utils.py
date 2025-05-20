@@ -60,7 +60,7 @@ def get_face_vector_from_csv(person_name):
         print(f"얼굴 벡터 가져오기 오류: {str(e)}")
         return None
 
-def save_to_csv(name, image_path, encoding_vector, timestamp):
+def save_to_csv(name, department, position, employeeId, image_path, encoding_vector, timestamp):
     """데이터를 CSV에 저장"""
     try:
         try:
@@ -74,6 +74,9 @@ def save_to_csv(name, image_path, encoding_vector, timestamp):
         
         new_row = {
             'name': name,
+            'department': department,
+            'position': position,
+            'employeeId': employeeId,
             'image_path': image_path,
             'encoding': encoding_str,
             'timestamp': timestamp

@@ -4,15 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>얼굴 특징 벡터 추출 및 저장</title>
+    <title>얼굴 등록 시스템</title>
     <link rel="stylesheet" href="static/css/face_register.css">
     <script src="/static/js/jquery-3.6.0.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>얼굴 특징 벡터 추출 및 저장</h1>
-            <p>카메라로 얼굴을 촬영하고 인물 이름을 입력하면 얼굴 특징 벡터를 추출하여 데이터베이스에 저장합니다.</p>
+            <h1>얼굴 등록 시스템</h1>
+            <p>얼굴 인식을 위해 다양한 각도에서 5장의 사진을 촬영하고 인적사항을 입력하세요.</p>
             <nav class="navigation">
                 <a href="/face_register" class="nav-link active">얼굴 등록</a>
                 <a href="/face_compare" class="nav-link">출퇴근 기록</a>
@@ -20,44 +20,99 @@
             </nav>
         </header>
 
-        <main>
-            <div class="capture-section">
-                <h2>새 얼굴 등록</h2>
+        <main class="registration-layout">
+            <!-- 왼쪽: 카메라 촬영 섹션 -->
+            <div class="camera-section">
+                <h2>얼굴 촬영</h2>
                 <div class="webcam-container">
                     <video id="webcam" autoplay playsinline></video>
                     <canvas id="canvas" class="hidden"></canvas>
                     <div id="capturePreview" class="capture-preview hidden">
                         <img id="capturedImage" src="" alt="캡처된 이미지">
                     </div>
-                    <!-- 얼굴 감지 영역 표시 오버레이 추가 -->
                     <div id="faceDetectionOverlay" class="face-detection-overlay"></div>
                 </div>
                 
                 <div class="face-guidance-message" id="faceGuidanceMessage">
-                    카메라를 시작하고 얼굴을 화면 중앙에 위치시켜주세요
+                    카메라를 시작하고 얼굴을 화면 중앙에 위치시켜주세요. 다양한 각도에서 5장의 사진을 촬영하세요.
                 </div>
                 
                 <div class="camera-controls">
                     <button id="startCameraBtn" class="primary-btn">카메라 시작</button>
                     <button id="captureBtn" class="primary-btn capture-btn" disabled>사진 촬영</button>
-                    <button id="retakeBtn" class="secondary-btn hidden">다시 촬영</button>
                 </div>
                 
-                <div class="person-info">
-                    <label for="personName">인물 이름:</label>
-                    <input type="text" id="personName" placeholder="예: 홍길동" required>
-                    <button id="saveBtn" class="success-btn" disabled>특징 벡터 추출 및 저장</button>
-                    <div id="spinner" class="spinner hidden"></div>
+                <!-- 5장의 사진 미리보기 섹션 -->
+                <div class="preview-container">
+                    <h3>촬영 이미지 (5장)</h3>
+                    <div class="image-previews">
+                        <div class="image-preview-item" data-index="0">
+                            <div class="image-placeholder">
+                                <span>1</span>
+                            </div>
+                            <button class="delete-preview-btn" data-index="0">×</button>
+                        </div>
+                        <div class="image-preview-item" data-index="1">
+                            <div class="image-placeholder">
+                                <span>2</span>
+                            </div>
+                            <button class="delete-preview-btn" data-index="1">×</button>
+                        </div>
+                        <div class="image-preview-item" data-index="2">
+                            <div class="image-placeholder">
+                                <span>3</span>
+                            </div>
+                            <button class="delete-preview-btn" data-index="2">×</button>
+                        </div>
+                        <div class="image-preview-item" data-index="3">
+                            <div class="image-placeholder">
+                                <span>4</span>
+                            </div>
+                            <button class="delete-preview-btn" data-index="3">×</button>
+                        </div>
+                        <div class="image-preview-item" data-index="4">
+                            <div class="image-placeholder">
+                                <span>5</span>
+                            </div>
+                            <button class="delete-preview-btn" data-index="4">×</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="results-section">
-                <h2>저장된 얼굴 목록</h2>
-                <div class="results-actions">
-                    <button id="refreshButton" class="secondary-btn">새로고침</button>
-                </div>
-                <div id="resultsList" class="results-list">
-                    <p class="no-results">저장된 얼굴이 없습니다.</p>
+            <!-- 오른쪽: 정보 입력 섹션 -->
+            <div class="info-section">
+                <h2>인적사항 입력</h2>
+                <div class="person-info-form">
+                    <div class="form-group">
+                        <label for="personName">이름 <span class="required">*</span></label>
+                        <input type="text" id="personName" placeholder="예: 홍길동" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="personDepartment">부서</label>
+                        <input type="text" id="personDepartment" placeholder="예: 개발팀">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="personPosition">직급</label>
+                        <input type="text" id="personPosition" placeholder="예: 대리">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="personEmployeeId">사번</label>
+                        <input type="text" id="personEmployeeId" placeholder="예: EMP001">
+                    </div>
+                    
+                    <div class="registration-status">
+                        <p>촬영된 사진: <span id="capturedCount">0</span>/5</p>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button id="saveBtn" class="success-btn" disabled>등록하기</button>
+                        <button id="resetBtn" class="secondary-btn">초기화</button>
+                        <div id="spinner" class="spinner hidden"></div>
+                    </div>
                 </div>
             </div>
         </main>

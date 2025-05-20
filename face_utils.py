@@ -19,10 +19,10 @@ except Exception as e:
     print(f"DeepFace 로딩 실패: {e}")
     exit(1)
 
-def process_face_image(name, image_data):
+def process_face_image(name, image_data, metadata=None):
     """얼굴 이미지 처리 및 특징 벡터 추출"""
     # 이미지 저장 경로 지정 - 슬래시 사용
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S.%f")[:-3]
     safe_name = sanitize_filename(name)  # 한글 이름 문제 해결
     image_filename = f"{safe_name}_{timestamp}.jpg"
     image_path = create_path(DATA_DIR, image_filename)  # 슬래시 경로 사용
@@ -89,6 +89,9 @@ def process_face_image(name, image_data):
         # CSV에 저장
         save_result = save_to_csv(
             name=name,
+            department=metadata.get("department", ""),
+            position=metadata.get("position", ""),
+            employeeId=metadata.get("employeeId", ""),
             image_path=image_path,
             encoding_vector=np.array(embedding_vector),
             timestamp=datetime.now().isoformat()
@@ -256,6 +259,10 @@ def detect_face(image_data: str) -> Dict[str, Any]:
                         "face_ratio": face_ratio,
                         "confidence": confidence
                     })
+
+                    global timestamp_face_detect_end
+                    timestamp_face_detect_end = datetime.now()
+                    print('Timestamp - Face Detect End:', timestamp_face_detect_end)
         
         # 유효한 얼굴이 없는 경우
         if not valid_faces:
@@ -294,6 +301,14 @@ def detect_face(image_data: str) -> Dict[str, Any]:
 
 def compare_face(image_data: str) -> Dict[str, Any]:
     """촬영된 얼굴과 등록된 얼굴들 비교"""
+
+    global timestamp_face_compare_start
+    timestamp_face_compare_start = datetime.now()
+    print('Timestamp - Face Compare Start:', timestamp_face_compare_start)
+    
+    time_diff = timestamp_face_compare_start - timestamp_face_detect_end
+    print(time_diff.total_seconds() * 1000)
+
     try:
         # CSV 파일 확인
         from config import CSV_PATH
@@ -389,6 +404,13 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         # 유사도가 일정 수준 이상인 얼굴만 필터링
         threshold = 0.6  # 60% 이상의 유사도를 가진 얼굴만 반환
         filtered_matches = [match for match in matches if match["confidence"] >= threshold]
+
+        global timestamp_face_compare_end
+        timestamp_face_compare_end = datetime.now()
+        print('Timestamp - Face Compare End:', timestamp_face_compare_end)
+        
+        time_diff = timestamp_face_compare_end - timestamp_face_compare_start
+        print(time_diff.total_seconds() * 1000)
         
         return {
             "success": True,

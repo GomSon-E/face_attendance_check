@@ -57,11 +57,13 @@ async def capture_face(data: Dict[str, Any] = Body(...)):
         name = data.get("name")
         image_data = data.get("image")
         
+        metadata = data.get("metadata")
+        
         if not name or not image_data:
             raise HTTPException(status_code=400, detail="이름과 이미지 데이터가 필요합니다.")
             
         # 이미지 처리 및 얼굴 벡터 추출
-        result = process_face_image(name, image_data)
+        result = process_face_image(name, image_data, metadata)
         return result
         
     except HTTPException:
