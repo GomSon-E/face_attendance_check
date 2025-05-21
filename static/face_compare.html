@@ -20,11 +20,36 @@
     <div id="result-popup-overlay">
         <div id="result-popup-content">
             <h2 id="popup-title"></h2>
-            <!-- 이미지를 상단에 표시 -->
-            <img id="matchedFaceImage" src="" alt="인식된 얼굴" style="display: none; max-width: 150px; max-height: 150px; margin: 10px auto;"> 
-            <div id="popup-message"></div>
-            <ul id="match-list" style="display: none;"></ul>
-            <button id="popup-close-button">확인</button>
+            
+            <!-- 단일 인식 결과 섹션 -->
+            <div id="single-match-section">
+                <!-- 인식된 얼굴 이미지 -->
+                <img id="matchedFaceImage" src="" alt="인식된 얼굴"> 
+                <div id="popup-message"></div>
+                <div class="confirmation-buttons" id="single-match-buttons">
+                    <button id="confirmYesBtn" class="confirm-btn yes-btn">네, 맞습니다</button>
+                    <button id="confirmNoBtn" class="confirm-btn no-btn">아니오, 다른 사람입니다</button>
+                </div>
+            </div>
+            
+            <!-- 다중 인식 결과 (후보자 목록) 섹션 -->
+            <div id="multiple-matches-section">
+                <p class="candidate-instruction">아래 후보 중 본인을 선택하세요:</p>
+                <div id="candidate-list" class="candidate-container">
+                    <!-- 후보자들이 여기에 동적으로 추가됨 -->
+                </div>
+            </div>
+            
+            <!-- 인식 실패 섹션 -->
+            <div id="no-match-section">
+                <p id="no-match-message"></p>
+            </div>
+            
+            <!-- 공통 버튼 영역 -->
+            <div class="popup-buttons">
+                <button id="popup-close-button">닫기</button>
+                <button id="retry-button" class="secondary-btn">다시 시도</button>
+            </div>
         </div>
     </div>
 

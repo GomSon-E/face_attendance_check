@@ -89,9 +89,11 @@ html, body {
     padding: 30px;
     border-radius: 15px;
     text-align: center;
-    max-width: 400px;
-    width: auto;
+    max-width: 450px;
+    width: 90%;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 /* 팝업 제목 */
@@ -112,70 +114,26 @@ html, body {
     color: #2980b9;
 }
 
-/* 팝업 버튼 */
+/* 팝업 버튼 공통 스타일 */
 #result-popup-content button {
     padding: 10px 20px;
-    background-color: #4CAF50;
-    color: white;
     border: none;
     border-radius: 5px;
     cursor: pointer;
     font-size: 16px;
     transition: background-color 0.3s ease;
+    margin: 5px;
 }
 
-/* 버튼 호버 효과 */
-#result-popup-content button:hover {
-    background-color: #45a049;
-}
-
-/* 오류 상태 버튼 */
-#result-popup-content button.error {
-    background-color: #f44336;
-}
-
-#result-popup-content button.error:hover {
-    background-color: #d32f2f;
-}
-
-/* 일치된 얼굴 이미지 스타일 */
-#matchedFaceImage {
+/* 섹션 기본 스타일 (모두 기본적으로 숨김) */
+#single-match-section,
+#multiple-matches-section,
+#no-match-section {
     display: none;
-    max-width: 150px;
-    max-height: 150px;
-    height: auto;
-    border-radius: 50%;
-    margin: 20px auto;
-    border: 3px solid #4CAF50;
-    object-fit: cover;
+    margin-bottom: 20px;
 }
 
-/* 결과 상태별 이미지 테두리 색상 */
-#result-popup-content.success #matchedFaceImage {
-    border-color: #4CAF50;
-}
-
-#result-popup-content.normal #matchedFaceImage {
-    border-color: #666;
-}
-
-#result-popup-content.error #matchedFaceImage {
-    border-color: #f44336;
-}
-
-/* 숨겨진 캔버스 */
-#hiddenCanvas {
-    display: none;
-}
-
-/* 사용자 확인 관련 스타일 */
-.confirmation-question {
-    font-size: 1.2rem;
-    font-weight: bold;
-    margin: 20px 0;
-    color: #333;
-}
-
+/* 확인 버튼 관련 스타일 */
 .confirmation-buttons {
     display: flex;
     justify-content: center;
@@ -211,9 +169,137 @@ html, body {
     background-color: #d32f2f;
 }
 
-/* 일치된 얼굴 이미지 스타일 개선 */
+.secondary-btn {
+    background-color: #7f8c8d;
+    color: white;
+}
+
+.secondary-btn:hover {
+    background-color: #6a7778;
+}
+
+/* 공통 버튼 영역 */
+.popup-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+#popup-close-button {
+    background-color: #4CAF50;
+    color: white;
+}
+
+#popup-close-button:hover {
+    background-color: #45a049;
+}
+
+#retry-button {
+    background-color: #7f8c8d;
+    color: white;
+}
+
+/* 후보자 목록 컨테이너 */
+.candidate-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 15px 0;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* 후보자 카드 */
+.candidate-card {
+    display: flex;
+    align-items: center;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.candidate-card:hover {
+    background-color: #e9ecef;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.candidate-card.selected {
+    border-color: #2980b9;
+    background-color: #ebf5fb;
+}
+
+.candidate-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 15px;
+    border: 2px solid #dee2e6;
+}
+
+.candidate-info {
+    flex: 1;
+    text-align: left;
+}
+
+.candidate-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin: 0 0 5px 0;
+}
+
+.candidate-details {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.similarity-badge {
+    background-color: #2980b9;
+    color: white;
+    border-radius: 30px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
+    margin-left: 10px;
+}
+
+/* 후보자 최종 선택 버튼 */
+#confirm-candidate-btn {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+    width: 100%;
+}
+
+#confirm-candidate-btn:hover {
+    background-color: #45a049;
+}
+
+#confirm-candidate-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* 후보자 선택 안내 메시지 */
+.candidate-instruction {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+/* 인식된 얼굴 이미지 스타일 */
 #matchedFaceImage {
-    display: none;
     max-width: 150px;
     max-height: 150px;
     height: auto;
@@ -222,13 +308,40 @@ html, body {
     border: 3px solid #4CAF50;
     object-fit: cover;
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    display: block;
+}
+
+/* 결과 상태별 이미지 테두리 색상 */
+#result-popup-content.success #matchedFaceImage {
+    border-color: #4CAF50;
+}
+
+#result-popup-content.normal #matchedFaceImage {
+    border-color: #666;
+}
+
+#result-popup-content.error #matchedFaceImage {
+    border-color: #f44336;
+}
+
+/* 숨겨진 캔버스 */
+#hiddenCanvas {
+    display: none;
+}
+
+/* 확인 메시지 스타일 */
+.confirmation-question {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin: 20px 0;
+    color: #333;
 }
 
 /* 모바일 최적화 */
 @media (max-width: 480px) {
     #result-popup-content {
-        max-width: 90%;
         padding: 20px;
+        max-width: 90%;
     }
     
     .confirmation-buttons {
@@ -238,5 +351,28 @@ html, body {
     
     .confirm-btn {
         width: 100%;
+    }
+    
+    .popup-buttons {
+        flex-direction: column;
+    }
+    
+    .popup-buttons button {
+        width: 100%;
+    }
+    
+    .candidate-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 15px;
+    }
+    
+    .candidate-image {
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+    
+    .candidate-info {
+        text-align: center;
     }
 }

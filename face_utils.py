@@ -188,19 +188,31 @@ def delete_face_data(face_id):
 
 def calculate_similarity(vector1: np.ndarray, vector2: np.ndarray) -> float:
     """두 벡터 간의 유클리드 거리 기반 유사도 계산"""
-    # 벡터 형태 확인 및 조정
-    v1 = vector1.flatten()
-    v2 = vector2.flatten()
-    
-    # 유클리드 거리 계산
-    euclidean_dist = np.linalg.norm(v1 - v2)
-    
-    # 거리를 유사도로 변환 (거리가 작을수록 유사도는 높음)
-    # 지수 함수를 사용하여 [0, 1] 범위로 변환 (1이 가장 유사)
-    # 거리가 0이면 유사도는 1, 거리가 커질수록 유사도는 0에 가까워짐
-    similarity = np.exp(-euclidean_dist / 10.0)
-    
-    return similarity
+    try:
+        # 벡터 형태 확인 및 조정
+        v1 = vector1.flatten()
+        v2 = vector2.flatten()
+        
+        # 유클리드 거리 계산
+        euclidean_dist = np.linalg.norm(v1 - v2)
+        
+        # 거리가 너무 크거나 NaN인 경우 처리
+        if np.isnan(euclidean_dist) or np.isinf(euclidean_dist):
+            return 0.0
+        
+        # 거리를 유사도로 변환 (거리가 작을수록 유사도는 높음)
+        # 지수 함수를 사용하여 [0, 1] 범위로 변환 (1이 가장 유사)
+        # 거리가 0이면 유사도는 1, 거리가 커질수록 유사도는 0에 가까워짐
+        similarity = np.exp(-euclidean_dist / 10.0)
+        
+        # NaN이나 무한대 값 체크
+        if np.isnan(similarity) or np.isinf(similarity):
+            return 0.0
+            
+        return float(similarity)  # float 타입으로 명시적 변환
+    except Exception as e:
+        print(f"유사도 계산 중 오류: {str(e)}")
+        return 0.0  # 오류 발생 시 기본값 반환
 
 def detect_face(image_data: str) -> Dict[str, Any]:
     """이미지에서 얼굴 감지"""
@@ -305,7 +317,6 @@ def compare_face(image_data: str) -> Dict[str, Any]:
     global timestamp_face_compare_start
     timestamp_face_compare_start = datetime.now()
     print('Timestamp - Face Compare Start:', timestamp_face_compare_start)
-    
     time_diff = timestamp_face_compare_start - timestamp_face_detect_end
     print(time_diff.total_seconds() * 1000)
 
@@ -357,7 +368,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         
         # 각 등록된 얼굴과 비교
         matches = []
-        
+
         for index, row in df.iterrows():
             try:
                 # 이미지 파일 존재 여부 확인
@@ -372,6 +383,10 @@ def compare_face(image_data: str) -> Dict[str, Any]:
                 # 유사도 계산
                 similarity = calculate_similarity(embedding_vector, registered_vector)
                 
+                # NaN이나 무한대 값 처리
+                if np.isnan(similarity) or np.isinf(similarity):
+                    similarity = 0.0
+                
                 # 이미지를 Base64로 인코딩
                 try:
                     registered_img = cv2.imread(image_path)
@@ -385,13 +400,23 @@ def compare_face(image_data: str) -> Dict[str, Any]:
                     print(f"이미지 인코딩 중 오류: {str(e)}")
                     continue
                 
-                # 일치 정보 추가
+                # 값이 존재하는지 확인하고 안전한 값으로 설정
+                name = row.get('name', '')
+                department = row.get('department', '') 
+                position = row.get('position', '')
+                employeeId = row.get('employeeId', '')
+                timestamp = row.get('timestamp', '')
+                
+                # 일치 정보 추가 - 사용자 메타데이터 추가 포함
                 matches.append({
                     "id": int(index),
-                    "name": row['name'],
-                    "confidence": float(similarity),
+                    "name": name if isinstance(name, str) else str(name),
+                    "department": department if isinstance(department, str) else str(department),
+                    "position": position if isinstance(position, str) else str(position),
+                    "employeeId": employeeId if isinstance(employeeId, str) else str(employeeId),
+                    "confidence": float(similarity),  # 명시적으로 float으로 변환
                     "image_path": image_path,
-                    "timestamp": row['timestamp'],
+                    "timestamp": timestamp if isinstance(timestamp, str) else str(timestamp),
                     "image_base64": img_base64
                 })
             except Exception as e:
@@ -401,21 +426,55 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         # 유사도에 따라 정렬
         matches = sorted(matches, key=lambda x: x["confidence"], reverse=True)
         
-        # 유사도가 일정 수준 이상인 얼굴만 필터링
-        threshold = 0.6  # 60% 이상의 유사도를 가진 얼굴만 반환
-        filtered_matches = [match for match in matches if match["confidence"] >= threshold]
-
-        global timestamp_face_compare_end
-        timestamp_face_compare_end = datetime.now()
-        print('Timestamp - Face Compare End:', timestamp_face_compare_end)
+        # 유사도 기준에 따라 결과 처리
+        # 1. 0.7 이상 유사도: 가장 높은 유사도를 가진 얼굴 하나만 반환
+        high_threshold = 0.7
+        medium_threshold = 0.5
         
+        high_matches = [match for match in matches if match["confidence"] >= high_threshold]
+        if high_matches:
+            best_match = high_matches[0]
+            
+            global timestamp_face_compare_end
+            timestamp_face_compare_end = datetime.now()
+            print('Timestamp - Face Compare End (High):', timestamp_face_compare_end)
+            time_diff = timestamp_face_compare_end - timestamp_face_compare_start
+            print(f"High match comparison time: {time_diff.total_seconds() * 1000} ms")
+            
+            return {
+                "success": True,
+                "match_type": "high",
+                "best_match": best_match
+            }
+        
+        # 2. 0.5 이상 0.7 미만 유사도: 상위 3개 후보 반환
+        medium_matches = [match for match in matches if high_threshold > match["confidence"] >= medium_threshold]
+        if medium_matches:
+            # 최대 3개까지만 반환
+            candidates = medium_matches[:3]
+            
+            timestamp_face_compare_end = datetime.now()
+            print('Timestamp - Face Compare End (Medium):', timestamp_face_compare_end)
+            time_diff = timestamp_face_compare_end - timestamp_face_compare_start
+            print(f"Medium match comparison time: {time_diff.total_seconds() * 1000} ms")
+            
+            return {
+                "success": True,
+                "match_type": "medium",
+                "candidates": candidates,
+                "total_candidates": len(candidates)
+            }
+        
+        # 3. 0.5 미만 유사도: 아무것도 반환하지 않음 (인식 실패)
+        timestamp_face_compare_end = datetime.now()
+        print('Timestamp - Face Compare End (Low):', timestamp_face_compare_end)
         time_diff = timestamp_face_compare_end - timestamp_face_compare_start
-        print(time_diff.total_seconds() * 1000)
+        print(f"Low match comparison time: {time_diff.total_seconds() * 1000} ms")
         
         return {
             "success": True,
-            "matches": filtered_matches,
-            "total_matches": len(filtered_matches)
+            "match_type": "low",
+            "message": "등록된 얼굴 중에 일치하는 얼굴을 찾지 못했습니다."
         }
     
     except Exception as e:
@@ -436,12 +495,17 @@ def register_attendance(name, image_data=None):
         # 이미지 데이터가 있으면 얼굴 추가 등록
         if image_data and result['success']:
             try:
-                # 이미지 추가 등록 (옵션)
-                face_result = process_face_image(name, image_data)
+                # 이미지 추가 등록
+                face_result = process_face_image(name, image_data, {
+                    "source": "auto_register",
+                    "memo": "출석 시스템에서 자동 등록된 얼굴"
+                })
                 result['face_registered'] = True
+                result['face_registration_details'] = face_result
             except Exception as e:
                 print(f"추가 얼굴 등록 중 오류: {str(e)}")
                 result['face_registered'] = False
+                result['face_registration_error'] = str(e)
         
         return result
     except Exception as e:

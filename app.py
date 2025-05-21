@@ -34,6 +34,25 @@ print(f"데이터 디렉토리 경로: {os.path.abspath(DATA_DIR)}")
 init_csv_file()
 init_attendance_csv()
 
+def sanitize_json_values(data):
+    """JSON 직렬화 전에 안전한 값으로 변환"""
+    if isinstance(data, dict):
+        return {k: sanitize_json_values(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [sanitize_json_values(item) for item in data]
+    elif isinstance(data, float):
+        import math
+        if math.isnan(data):
+            return None
+        elif math.isinf(data):
+            return str(data)
+        return data
+    elif data is None or isinstance(data, (str, int, bool)):
+        return data
+    else:
+        # 기타 타입은 문자열로 변환
+        return str(data)
+
 @app.get("/face_register")
 async def read_root():
     """루트 경로 접근 시 인덱스 페이지 반환"""
@@ -129,7 +148,9 @@ async def compare_face_api(data: Dict[str, Any] = Body(...)):
             raise HTTPException(status_code=400, detail="이미지 데이터가 필요합니다.")
         
         result = compare_face(image_data)
-        return result
+        # JSON 직렬화를 위해 안전한 값으로 변환
+        sanitized_result = sanitize_json_values(result)
+        return sanitized_result
     except HTTPException:
         raise
     except Exception as e:
