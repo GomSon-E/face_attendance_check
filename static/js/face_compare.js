@@ -199,7 +199,7 @@ function captureFrameAndSend() {
                     const faceImageData = compressCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
                     
                     // 원본 이미지 저장 (후보자 선택 시 얼굴 등록에 사용)
-                    capturedOriginalImage = imageData;
+                    capturedOriginalImage = faceImageData;
                     
                     // 비교 시작
                     isComparingFace = true;
@@ -517,6 +517,8 @@ function handleNoMatch(message) {
     // 팝업 표시
     showResultPopup();
 
+    playAudio('error'); // 오류 음성 재생
+
     initAfterResultPopup();
 }
 
@@ -571,6 +573,8 @@ function handleIdentityDenial() {
         <p>관리자에게 문의하거나 얼굴 등록을 다시 해주세요.</p>
     `;
 
+    playAudio('error'); // 오류 음성 재생
+
     initAfterResultPopup();
 }
 
@@ -603,6 +607,8 @@ function showAttendanceSuccess(name, date, time, tag, newFaceRegistered) {
     
     // 팝업 제목 업데이트
     popupTitleElement.textContent = "출근 등록 완료";
+
+    playAudio('success'); // 성공 음성 재생
 
     initAfterResultPopup();
 }
@@ -819,6 +825,12 @@ function closeCamera() {
     // 플래그 초기화
     isComparingFace = false;
     isProcessing = false;
+}
+
+function playAudio(type) {
+    const soundFile = `/static/audio/${type}.mp3`;
+    const audio = new Audio(soundFile);
+    audio.play()
 }
 
 // 페이지 로드 시 초기화 및 카메라 자동 실행
