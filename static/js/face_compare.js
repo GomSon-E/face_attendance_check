@@ -516,6 +516,8 @@ function handleNoMatch(message) {
     
     // 팝업 표시
     showResultPopup();
+
+    initAfterResultPopup();
 }
 
 // 출근 등록 처리
