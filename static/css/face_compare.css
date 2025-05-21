@@ -87,9 +87,9 @@ html, body {
     background-color: white;
     color: #333;
     padding: 30px;
-    border-radius: 10px;
+    border-radius: 15px;
     text-align: center;
-    max-width: 80%;
+    max-width: 400px;
     width: auto;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
@@ -97,37 +97,19 @@ html, body {
 /* 팝업 제목 */
 #result-popup-content h2 {
     margin-top: 0;
+    font-size: 1.5rem;
+    color: #2980b9;
 }
 
 /* 팝업 메시지 */
 #result-popup-content p {
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     font-size: 1rem;
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
-/* 일치 목록 스타일 (현재 미사용) */
-#result-popup-content ul {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 20px 0;
-    max-height: 100px;
-    overflow-y: auto;
-    border-top: 1px solid #eee;
-    border-bottom: 1px solid #eee;
-    text-align: left;
-    display: none;
-}
-
-#result-popup-content li {
-    padding: 5px 0;
-    border-bottom: 1px solid #eee;
-    font-size: 0.9em;
-    color: #555;
-}
-
-#result-popup-content li:last-child {
-    border-bottom: none;
+#result-popup-content p strong {
+    color: #2980b9;
 }
 
 /* 팝업 버튼 */
@@ -184,4 +166,77 @@ html, body {
 /* 숨겨진 캔버스 */
 #hiddenCanvas {
     display: none;
+}
+
+/* 사용자 확인 관련 스타일 */
+.confirmation-question {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin: 20px 0;
+    color: #333;
+}
+
+.confirmation-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.confirm-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.yes-btn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.yes-btn:hover {
+    background-color: #3e8e41;
+}
+
+.no-btn {
+    background-color: #f44336;
+    color: white;
+}
+
+.no-btn:hover {
+    background-color: #d32f2f;
+}
+
+/* 일치된 얼굴 이미지 스타일 개선 */
+#matchedFaceImage {
+    display: none;
+    max-width: 150px;
+    max-height: 150px;
+    height: auto;
+    border-radius: 50%;
+    margin: 20px auto;
+    border: 3px solid #4CAF50;
+    object-fit: cover;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* 모바일 최적화 */
+@media (max-width: 480px) {
+    #result-popup-content {
+        max-width: 90%;
+        padding: 20px;
+    }
+    
+    .confirmation-buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .confirm-btn {
+        width: 100%;
+    }
 }

@@ -29,7 +29,7 @@ var isComparingFace = false;
 
 // --- 설정 값 ---
 // 얼굴 영역이 전체 프레임의 최소 몇 %를 차지해야 충분히 크다고 판단할지
-const MIN_FACE_RATIO = 0.05;
+const MIN_FACE_RATIO = 0.1;
 // API 전송 시 이미지 크기 축소 비율
 const IMAGE_SCALE_FACTOR = 0.5;
 
@@ -301,15 +301,18 @@ async function performFaceComparison(faceImageData, finalFaceRatioPercent, origi
                 }
 
                 // *** 백엔드에서 반환하는 가장 일치하는 얼굴 이미지 데이터 ***
-                const bestMatchImageData = data.best_match_image;
+                const bestMatchImageData = bestMatch.image_base64 || null;
+                const personName = bestMatch.name || '알 수 없음';
+                const confidencePercent = bestMatch.confidence !== undefined ? Math.round(bestMatch.confidence * 100) : 0;
 
-               // 결과 팝업 표시 - 가장 유사도가 높은 얼굴 정보 및 이미지 표시
-               showResultPopup(
-                   '얼굴 인식 성공!',
-                   `인식된 얼굴 크기: ${finalFaceRatioPercent}%<br>가장 일치하는 얼굴: ${bestMatch?.name || '알 수 없음'} (유사도: ${bestMatch?.confidence !== undefined ? Math.round(bestMatch.confidence * 100) + '%' : '정보 없음'})<br><span class="small-text">`,
-                   bestMatchImageData, // 이미지 데이터 전달
-                   'success'
-               );
+                // 결과 팝업 표시 - 가장 유사도가 높은 얼굴 정보 및 이미지 표시
+                // 수정: 메시지 형식 변경 - showResultPopup 함수가 이를 파싱하기 때문
+                showResultPopup(
+                    '얼굴 인식 성공!',
+                    `가장 일치하는 얼굴: ${personName} (유사도: ${confidencePercent}%)`,
+                    bestMatchImageData, // 이미지 데이터 전달
+                    'success'
+                );
 
            } else {
                // 일치하는 얼굴이 없음 (matches 배열이 비어있거나 total_matches가 0)
@@ -318,7 +321,7 @@ async function performFaceComparison(faceImageData, finalFaceRatioPercent, origi
                // 결과 팝업 표시 - 일치 없음 메시지 (이미지 데이터는 없음)
                showResultPopup(
                    '일치하는 얼굴 없음',
-                   `인식된 얼굴 크기: ${finalFaceRatioPercent}%<br>등록된 얼굴 중에 일치하는 얼굴을 찾지 못했습니다.<br><span class="small-text">`,
+                   '등록된 얼굴 중에 일치하는 얼굴을 찾지 못했습니다.',
                    null, // 이미지 데이터 없음
                    'normal'
                );
@@ -355,7 +358,68 @@ async function performFaceComparison(faceImageData, finalFaceRatioPercent, origi
 function showResultPopup(title, message, imageDataUrl, type = 'success') { // imageDataUrl 인자 추가
    // 팝업 내용 업데이트
    popupTitleElement.textContent = title;
-   popupMessageElement.innerHTML = message;
+   
+   if (type === 'success' && imageDataUrl) {
+       // 인식 성공 시 새로운 형태의 메시지로 변경
+       const matchInfo = message.match(/가장 일치하는 얼굴: ([^(]+) \(유사도: (\d+)%\)/);
+       const personName = matchInfo ? matchInfo[1].trim() : '알 수 없음';
+       const similarity = matchInfo ? matchInfo[2] : '0';
+       
+       // 새로운 확인 메시지로 변경
+       popupMessageElement.innerHTML = `
+           <p>인식된 사용자: <strong>${personName}</strong></p>
+           <p>유사도: <strong>${similarity}%</strong></p>
+           <p class="confirmation-question">본인이 맞습니까?</p>
+           <div class="confirmation-buttons">
+               <button id="confirmYesBtn" class="confirm-btn yes-btn">네, 맞습니다</button>
+               <button id="confirmNoBtn" class="confirm-btn no-btn">아니오, 다른 사람입니다</button>
+           </div>
+       `;
+       
+       // 확인 버튼에 이벤트 리스너 추가
+       setTimeout(() => {
+           const yesBtn = document.getElementById('confirmYesBtn');
+           const noBtn = document.getElementById('confirmNoBtn');
+           
+           if (yesBtn) {
+               yesBtn.addEventListener('click', function() {
+                   handleConfirmation(true, personName);
+               });
+           }
+           
+           if (noBtn) {
+               noBtn.addEventListener('click', function() {
+                   handleConfirmation(false, personName);
+               });
+           }
+       }, 100);
+       
+       // 기존 '확인' 버튼 숨기기
+       if (popupCloseButton) {
+           popupCloseButton.style.display = 'none';
+       }
+   } else if (type === 'normal') {
+       // 일치하는 얼굴이 없는 경우
+       popupMessageElement.innerHTML = `
+           <p>등록된 얼굴 중에 일치하는 얼굴을 찾지 못했습니다.</p>
+           <p>얼굴 등록 페이지에서 먼저 등록해주세요.</p>
+       `;
+       
+       // 기존 '확인' 버튼 표시
+       if (popupCloseButton) {
+           popupCloseButton.style.display = 'block';
+           popupCloseButton.textContent = '확인';
+       }
+   } else {
+       // 오류 상황 등 다른 경우
+       popupMessageElement.innerHTML = message;
+       
+       // 기존 '확인' 버튼 표시
+       if (popupCloseButton) {
+           popupCloseButton.style.display = 'block';
+           popupCloseButton.textContent = '확인';
+       }
+   }
 
     // 이미지 데이터 처리
     if (imageDataUrl) {
@@ -368,7 +432,6 @@ function showResultPopup(title, message, imageDataUrl, type = 'success') { // im
         matchedFaceImageElement.style.display = 'none'; // 이미지 숨김
         matchedFaceImageElement.className = ''; // 클래스 초기화
     }
-
 
    // 팝업 제목/메시지/버튼 색상 등을 타입에 따라 변경
    if (resultPopupContent) {
@@ -383,13 +446,38 @@ function showResultPopup(title, message, imageDataUrl, type = 'success') { // im
    if (popupMessageElement) popupMessageElement.className = type || '';
    if (popupCloseButton) popupCloseButton.className = type || ''; // 버튼 색상 변경용 클래스
 
-
    // 팝업 표시
    if (resultPopupOverlay) { // 요소가 null이 아닐 때만 표시
        resultPopupOverlay.classList.add('visible');
    }
 }
 
+// 사용자 확인 처리 함수
+function handleConfirmation(isConfirmed, personName) {
+    if (isConfirmed) {
+        // 사용자가 '네, 맞습니다' 버튼을 클릭한 경우
+        // 여기에 출석/퇴근 기록 등의 처리를 할 수 있습니다
+        popupMessageElement.innerHTML = `
+            <p><strong>${personName}</strong>님 환영합니다!</p>
+            <p>출석이 성공적으로 기록되었습니다.</p>
+        `;
+        
+        // API 호출할 수도 있음
+        // registerAttendanceAPI(personName);
+    } else {
+        // 사용자가 '아니오, 다른 사람입니다' 버튼을 클릭한 경우
+        popupMessageElement.innerHTML = `
+            <p>인식 정보가 정확하지 않습니다.</p>
+            <p>관리자에게 문의하거나 얼굴 등록을 다시 해주세요.</p>
+        `;
+    }
+    
+    // 확인 버튼 표시
+    if (popupCloseButton) {
+        popupCloseButton.style.display = 'block';
+        popupCloseButton.textContent = '닫기';
+    }
+}
 
 // 결과 팝업을 숨기는 함수
 function hideResultPopup() {
@@ -401,7 +489,6 @@ function hideResultPopup() {
          console.warn("Result popup overlay element not found when trying to hide popup.");
     }
 }
-
 
 // 카메라 스트림 시작 및 비디오 재생
 async function openCamera() {

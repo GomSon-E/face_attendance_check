@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>얼굴 크기 인식</title>
+    <title>얼굴 인식 출석 시스템</title>
     <link rel="stylesheet" href="/static/css/face_compare.css">
 </head>
 <body>
@@ -20,11 +20,10 @@
     <div id="result-popup-overlay">
         <div id="result-popup-content">
             <h2 id="popup-title"></h2>
-            <p id="popup-message"></p>
-
-            <img id="matchedFaceImage" src="" alt="Matched Face" style="display: none; max-width: 150px; max-height: 150px; margin: 10px auto;"> 
-            <ul id="match-list"></ul>
-
+            <!-- 이미지를 상단에 표시 -->
+            <img id="matchedFaceImage" src="" alt="인식된 얼굴" style="display: none; max-width: 150px; max-height: 150px; margin: 10px auto;"> 
+            <div id="popup-message"></div>
+            <ul id="match-list" style="display: none;"></ul>
             <button id="popup-close-button">확인</button>
         </div>
     </div>
