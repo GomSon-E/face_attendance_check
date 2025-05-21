@@ -187,32 +187,34 @@ def delete_face_data(face_id):
     return {"success": True, "message": "얼굴 데이터가 성공적으로 삭제되었습니다."}
 
 def calculate_similarity(vector1: np.ndarray, vector2: np.ndarray) -> float:
-    """두 벡터 간의 유클리드 거리 기반 유사도 계산"""
+    """두 벡터 간의 코사인 유사도 계산"""
     try:
-        # 벡터 형태 확인 및 조정
+        # 벡터를 1차원으로 변환 (필요하다면)
         v1 = vector1.flatten()
         v2 = vector2.flatten()
-        
-        # 유클리드 거리 계산
-        euclidean_dist = np.linalg.norm(v1 - v2)
-        
-        # 거리가 너무 크거나 NaN인 경우 처리
-        if np.isnan(euclidean_dist) or np.isinf(euclidean_dist):
+
+        # 두 벡터의 내적 계산
+        dot_product = np.dot(v1, v2)
+
+        # 각 벡터의 유클리드 노름(크기) 계산
+        norm_v1 = np.linalg.norm(v1)
+        norm_v2 = np.linalg.norm(v2)
+
+        # 노름이 0인 경우 (영벡터) 처리
+        if norm_v1 == 0 or norm_v2 == 0:
             return 0.0
-        
-        # 거리를 유사도로 변환 (거리가 작을수록 유사도는 높음)
-        # 지수 함수를 사용하여 [0, 1] 범위로 변환 (1이 가장 유사)
-        # 거리가 0이면 유사도는 1, 거리가 커질수록 유사도는 0에 가까워짐
-        similarity = np.exp(-euclidean_dist / 10.0)
-        
-        # NaN이나 무한대 값 체크
-        if np.isnan(similarity) or np.isinf(similarity):
-            return 0.0
-            
-        return float(similarity)  # float 타입으로 명시적 변환
+
+        # 코사인 유사도 계산: 내적 / (v1 크기 * v2 크기)
+        similarity = dot_product / (norm_v1 * norm_v2)
+
+        # 결과가 [ -1, 1 ] 범위를 벗어나는 미세한 부동소수점 오류 방지
+        similarity = np.clip(similarity, -1.0, 1.0)
+
+        return float(similarity)
+
     except Exception as e:
-        print(f"유사도 계산 중 오류: {str(e)}")
-        return 0.0  # 오류 발생 시 기본값 반환
+        print(f"코사인 유사도 계산 중 오류: {str(e)}")
+        return 0.0 # 오류 발생 시 기본값 반환
 
 def detect_face(image_data: str) -> Dict[str, Any]:
     """이미지에서 얼굴 감지"""
