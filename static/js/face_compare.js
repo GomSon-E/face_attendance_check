@@ -563,10 +563,13 @@ function handleIdentityDenial() {
     noMatchSection.style.display = "block";
     
     // 메시지 업데이트
+    popupTitleElement.textContent = '얼굴 인식 실패';
     noMatchMessage.innerHTML = `
         <p>인식 정보가 정확하지 않습니다.</p>
         <p>관리자에게 문의하거나 얼굴 등록을 다시 해주세요.</p>
     `;
+
+    initAfterResultPopup();
 }
 
 // 출석 등록 성공 표시
@@ -598,6 +601,8 @@ function showAttendanceSuccess(name, date, time, tag, newFaceRegistered) {
     
     // 팝업 제목 업데이트
     popupTitleElement.textContent = "출석 등록 완료";
+
+    initAfterResultPopup();
 }
 
 // 출석 등록 오류 표시
@@ -616,16 +621,14 @@ function showAttendanceError(errorMessage) {
     
     // 팝업 제목 업데이트
     popupTitleElement.textContent = "출석 등록 오류";
+    
+    initAfterResultPopup();
 }
 
 // 결과 팝업 준비
 function prepareResultPopup(title) {
     // 팝업 제목 설정
     popupTitleElement.textContent = title;
-    
-    // 닫기 버튼 표시
-    popupCloseButton.style.display = "block";
-    retryButton.style.display = "block";
 }
 
 // 결과 팝업 표시
@@ -645,6 +648,13 @@ function hideResultPopup() {
     } else {
         console.warn("Result popup overlay element not found");
     }
+}
+
+function initAfterResultPopup() {
+    setTimeout(() => {
+        hideResultPopup();
+        openCamera();
+    }, 1500);
 }
 
 // 카메라 스트림 시작 및 비디오 재생
@@ -816,14 +826,6 @@ function init() {
     // 결과 팝업 닫기 버튼 이벤트 리스너 연결
     if (popupCloseButton) {
         popupCloseButton.addEventListener('click', hideResultPopup);
-    }
-    
-    // 다시 시도 버튼 이벤트 리스너 연결
-    if (retryButton) {
-        retryButton.addEventListener('click', function() {
-            hideResultPopup();
-            setTimeout(openCamera, 500); // 팝업이 완전히 닫힌 후 카메라 다시 시작
-        });
     }
 
     // 페이지 로드 시 자동으로 카메라 열기 시도
