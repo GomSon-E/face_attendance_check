@@ -473,14 +473,14 @@ function handleMediumConfidenceMatches(candidates) {
     
     confirmCandidateBtn = document.createElement('button');
     confirmCandidateBtn.id = 'confirm-candidate-btn';
-    confirmCandidateBtn.textContent = '선택한 사용자로 출석 등록';
+    confirmCandidateBtn.textContent = '선택한 사용자로 출근 등록';
     confirmCandidateBtn.disabled = true; // 초기에는 비활성화
     
     confirmCandidateBtn.onclick = function() {
         if (selectedCandidateId !== null) {
             const selectedCandidate = candidates.find(c => c.id == selectedCandidateId);
             if (selectedCandidate) {
-                // 출석 등록 및 얼굴 추가 등록
+                // 출근 등록 및 얼굴 추가 등록
                 handleAttendanceRegistration(selectedCandidate.name, true);
             }
         }
@@ -518,7 +518,7 @@ function handleNoMatch(message) {
     showResultPopup();
 }
 
-// 출석 등록 처리
+// 출근 등록 처리
 async function handleAttendanceRegistration(personName, registerNewFace) {
     try {
         const attendanceData = {
@@ -545,10 +545,10 @@ async function handleAttendanceRegistration(personName, registerNewFace) {
         const data = await response.json();
         
         if (data.success) {
-            // 출석 등록 성공 메시지 표시
+            // 출근 등록 성공 메시지 표시
             showAttendanceSuccess(personName, data.date, data.time, data.tag, registerNewFace);
         } else {
-            throw new Error(data.message || '출석 등록 실패');
+            throw new Error(data.message || '출근 등록 실패');
         }
     } catch (error) {
         console.error("Attendance registration failed:", error);
@@ -572,7 +572,7 @@ function handleIdentityDenial() {
     initAfterResultPopup();
 }
 
-// 출석 등록 성공 표시
+// 출근 등록 성공 표시
 function showAttendanceSuccess(name, date, time, tag, newFaceRegistered) {
     // 모든 섹션 숨김
     singleMatchSection.style.display = "none";
@@ -592,7 +592,7 @@ function showAttendanceSuccess(name, date, time, tag, newFaceRegistered) {
     // 메시지 업데이트
     noMatchMessage.innerHTML = `
         <p><strong>${name}</strong>님 환영합니다!</p>
-        <p>출석이 성공적으로 기록되었습니다.</p>
+        <p>출근이 성공적으로 기록되었습니다.</p>
         <p>날짜: ${date}</p>
         <p>시간: ${time}</p>
         <p>태그: ${tagText}</p>
@@ -600,12 +600,12 @@ function showAttendanceSuccess(name, date, time, tag, newFaceRegistered) {
     `;
     
     // 팝업 제목 업데이트
-    popupTitleElement.textContent = "출석 등록 완료";
+    popupTitleElement.textContent = "출근 등록 완료";
 
     initAfterResultPopup();
 }
 
-// 출석 등록 오류 표시
+// 출근 등록 오류 표시
 function showAttendanceError(errorMessage) {
     // 모든 섹션 숨김
     singleMatchSection.style.display = "none";
@@ -614,13 +614,13 @@ function showAttendanceError(errorMessage) {
     
     // 메시지 업데이트
     noMatchMessage.innerHTML = `
-        <p style="color: #e74c3c;">출석 등록 중 오류가 발생했습니다.</p>
+        <p style="color: #e74c3c;">출근 등록 중 오류가 발생했습니다.</p>
         <p>${errorMessage}</p>
         <p>잠시 후 다시 시도하거나 관리자에게 문의하세요.</p>
     `;
     
     // 팝업 제목 업데이트
-    popupTitleElement.textContent = "출석 등록 오류";
+    popupTitleElement.textContent = "출근 등록 오류";
     
     initAfterResultPopup();
 }

@@ -498,7 +498,7 @@ def register_attendance(name, image_data=None):
                 # 이미지 추가 등록
                 face_result = process_face_image(name, image_data, {
                     "source": "auto_register",
-                    "memo": "출석 시스템에서 자동 등록된 얼굴"
+                    "memo": "출근 시스템에서 자동 등록된 얼굴"
                 })
                 result['face_registered'] = True
                 result['face_registration_details'] = face_result
