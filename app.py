@@ -1,3 +1,4 @@
+# app.py
 import os
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import FileResponse
@@ -185,6 +186,9 @@ async def register_attendance_api(data: Dict[str, Any] = Body(...)):
 @app.get("/api/attendance")
 async def get_attendance_api(
     name: str = None,
+    department: str = None,
+    position: str = None,
+    employeeId: str = None,
     start_date: str = None,
     end_date: str = None,
     tag: str = None
@@ -194,6 +198,9 @@ async def get_attendance_api(
         # 필터 구성
         filters = {
             'name': name,
+            'department': department,
+            'position': position,
+            'employeeId': employeeId,
             'start_date': start_date,
             'end_date': end_date,
             'tag': tag
@@ -239,7 +246,7 @@ async def get_attendance_api(
 
 @app.put("/api/attendance/{record_id}")
 async def update_attendance_api(record_id: int, data: Dict[str, Any] = Body(...)):
-    """출퇴근 기록 태그 수정 API"""
+    """출퇴근 기록 태그 수정 API (record_id 기반)"""
     try:
         tag = data.get("tag")
         

@@ -251,7 +251,19 @@ def get_attendance_records(filters=None):
         if filters:
             # 이름 필터
             if 'name' in filters and filters['name']:
-                df = df[df['name'].str.contains(filters['name'], case=False)]
+                df = df[df['name'].str.contains(filters['name'], case=False, na=False)]
+            
+            # 부서 필터
+            if 'department' in filters and filters['department']:
+                df = df[df['department'].str.contains(filters['department'], case=False, na=False)]
+            
+            # 직급 필터
+            if 'position' in filters and filters['position']:
+                df = df[df['position'].str.contains(filters['position'], case=False, na=False)]
+            
+            # 사번 필터
+            if 'employeeId' in filters and filters['employeeId']:
+                df = df[df['employeeId'].str.contains(filters['employeeId'], case=False, na=False)]
             
             # 날짜 필터 (시작일)
             if 'start_date' in filters and filters['start_date']:

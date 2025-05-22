@@ -1,6 +1,9 @@
 $(document).ready(function() {
     // 요소 참조
     const $nameFilter = $('#nameFilter');
+    const $departmentFilter = $('#departmentFilter');
+    const $positionFilter = $('#positionFilter');
+    const $employeeIdFilter = $('#employeeIdFilter');
     const $startDateFilter = $('#startDateFilter');
     const $endDateFilter = $('#endDateFilter');
     const $tagFilter = $('#tagFilter');
@@ -78,6 +81,24 @@ $(document).ready(function() {
             }
         });
         
+        $departmentFilter.on('keyup', function(event) {
+            if (event.key === 'Enter') {
+                $searchBtn.click();
+            }
+        });
+        
+        $positionFilter.on('keyup', function(event) {
+            if (event.key === 'Enter') {
+                $searchBtn.click();
+            }
+        });
+        
+        $employeeIdFilter.on('keyup', function(event) {
+            if (event.key === 'Enter') {
+                $searchBtn.click();
+            }
+        });
+        
         // 태그 클릭 이벤트 위임
         $attendanceTableBody.on('click', '.tag-editable', function() {
             startTagEdit($(this));
@@ -102,6 +123,9 @@ $(document).ready(function() {
     function getFilterValues() {
         return {
             name: $nameFilter.val().trim(),
+            department: $departmentFilter.val().trim(),
+            position: $positionFilter.val().trim(),
+            employeeId: $employeeIdFilter.val().trim(),
             start_date: $startDateFilter.val(),
             end_date: $endDateFilter.val(),
             tag: $tagFilter.val()
@@ -117,6 +141,9 @@ $(document).ready(function() {
         
         // 필터 초기화
         $nameFilter.val('');
+        $departmentFilter.val('');
+        $positionFilter.val('');
+        $employeeIdFilter.val('');
         $startDateFilter.val(formatDateForInput(oneMonthAgo));
         $endDateFilter.val(formatDateForInput(today));
         $tagFilter.val('');
@@ -142,6 +169,9 @@ $(document).ready(function() {
         
         // 필터 파라미터 추가
         if (filters.name) apiUrl += `name=${encodeURIComponent(filters.name)}&`;
+        if (filters.department) apiUrl += `department=${encodeURIComponent(filters.department)}&`;
+        if (filters.position) apiUrl += `position=${encodeURIComponent(filters.position)}&`;
+        if (filters.employeeId) apiUrl += `employeeId=${encodeURIComponent(filters.employeeId)}&`;
         if (filters.start_date) apiUrl += `start_date=${encodeURIComponent(filters.start_date)}&`;
         if (filters.end_date) apiUrl += `end_date=${encodeURIComponent(filters.end_date)}&`;
         if (filters.tag) apiUrl += `tag=${encodeURIComponent(filters.tag)}`;
@@ -152,6 +182,7 @@ $(document).ready(function() {
             type: 'GET',
             success: function(response) {
                 if (response.success) {
+                    // 데이터 캐싱 (record_id 기반)
                     cachedData = response.records;
                     
                     displayAttendanceData(response.records);
@@ -246,7 +277,7 @@ $(document).ready(function() {
         $cell.find('.tag-edit-cell').append('<span class="saving-indicator"></span>');
         $cell.find('button, select').prop('disabled', true);
         
-        // API 호출
+        // API 호출 (record_id 기반)
         $.ajax({
             url: `${API_URL}/api/attendance/${recordId}`,
             type: 'PUT',
@@ -307,6 +338,9 @@ $(document).ready(function() {
         
         // 현재 필터 파라미터 추가
         if (currentFilters.name) apiUrl += `name=${encodeURIComponent(currentFilters.name)}&`;
+        if (currentFilters.department) apiUrl += `department=${encodeURIComponent(currentFilters.department)}&`;
+        if (currentFilters.position) apiUrl += `position=${encodeURIComponent(currentFilters.position)}&`;
+        if (currentFilters.employeeId) apiUrl += `employeeId=${encodeURIComponent(currentFilters.employeeId)}&`;
         if (currentFilters.start_date) apiUrl += `start_date=${encodeURIComponent(currentFilters.start_date)}&`;
         if (currentFilters.end_date) apiUrl += `end_date=${encodeURIComponent(currentFilters.end_date)}&`;
         if (currentFilters.tag) apiUrl += `tag=${encodeURIComponent(currentFilters.tag)}`;
@@ -317,7 +351,7 @@ $(document).ready(function() {
             type: 'GET',
             success: function(response) {
                 if (response.success && response.records.length > 0) {
-                    // CSV 헤더
+                    // CSV 헤더 (부서, 직책, 사번 추가)
                     let csvContent = "이름,부서,직급,사번,날짜,시간,태그\n";
                     
                     // CSV 데이터 추가
