@@ -1,4 +1,3 @@
-# utils.py - 일반 유틸리티 함수
 import os
 import re
 import hashlib
@@ -60,6 +59,29 @@ def get_face_vector_from_csv(person_name):
         print(f"얼굴 벡터 가져오기 오류: {str(e)}")
         return None
 
+def get_person_info_from_csv(person_name):
+    """CSV에서 특정 인물의 정보 가져오기 (부서, 직책, 사번 포함)"""
+    try:
+        df = pd.read_csv(CSV_PATH)
+        # 이름으로 필터링
+        person_data = df[df['name'] == person_name]
+        
+        if person_data.empty:
+            return None
+            
+        # 가장 최근 데이터 사용
+        latest_data = person_data.iloc[-1]
+        
+        return {
+            'name': latest_data.get('name', ''),
+            'department': latest_data.get('department', ''),
+            'position': latest_data.get('position', ''),
+            'employeeId': latest_data.get('employeeId', '')
+        }
+    except Exception as e:
+        print(f"인물 정보 가져오기 오류: {str(e)}")
+        return None
+
 def save_to_csv(name, department, position, employeeId, image_path, encoding_vector, timestamp):
     """데이터를 CSV에 저장"""
     try:
@@ -91,11 +113,34 @@ def save_to_csv(name, department, position, employeeId, image_path, encoding_vec
         return False
     
 def init_attendance_csv():
-    """출퇴근 기록 CSV 파일 초기화"""
+    """출퇴근 기록 CSV 파일 초기화 (부서, 직책, 사번 컬럼 추가)"""
     if not os.path.exists(ATTENDANCE_CSV_PATH):
-        df = pd.DataFrame(columns=['name', 'date', 'time', 'tag'])
+        df = pd.DataFrame(columns=['record_id', 'name', 'department', 'position', 'employeeId', 'date', 'time', 'tag'])
         df.to_csv(ATTENDANCE_CSV_PATH, index=False)
         print(f"출퇴근 기록 CSV 파일 '{ATTENDANCE_CSV_PATH}'이 생성되었습니다.")
+    else:
+        # 기존 파일이 있으면 컬럼 확인 및 업데이트
+        try:
+            df = pd.read_csv(ATTENDANCE_CSV_PATH)
+            expected_columns = ['record_id', 'name', 'department', 'position', 'employeeId', 'date', 'time', 'tag']
+            
+            # 누락된 컬럼 추가
+            for col in expected_columns:
+                if col not in df.columns:
+                    df[col] = ''
+                    print(f"출퇴근 기록 CSV에 '{col}' 컬럼 추가됨")
+            
+            # record_id가 없거나 잘못된 경우 재생성
+            if 'record_id' not in df.columns or df['record_id'].isna().any():
+                df['record_id'] = df.index
+                print("출퇴근 기록 CSV에 record_id 재생성됨")
+            
+            # 컬럼 순서 정렬
+            df = df[expected_columns]
+            df.to_csv(ATTENDANCE_CSV_PATH, index=False)
+            print("출퇴근 기록 CSV 컬럼 구조 업데이트 완료")
+        except Exception as e:
+            print(f"출퇴근 기록 CSV 업데이트 중 오류: {str(e)}")
 
 def determine_attendance_tag():
     """현재 시간에 따른 출퇴근 태그 결정"""
@@ -115,23 +160,47 @@ def determine_attendance_tag():
         return ""
 
 def record_attendance(name):
-    """출퇴근 기록 저장"""
+    """출퇴근 기록 저장 (부서, 직책, 사번 정보 포함)"""
     try:
         now = datetime.datetime.now()
         date_str = now.strftime("%Y-%m-%d")
         time_str = now.strftime("%H:%M:%S")
         tag = determine_attendance_tag()
         
+        # 사용자 정보 가져오기
+        person_info = get_person_info_from_csv(name)
+        if person_info:
+            department = person_info['department']
+            position = person_info['position']
+            employeeId = person_info['employeeId']
+        else:
+            department = ''
+            position = ''
+            employeeId = ''
+            print(f"경고: {name}의 인물 정보를 찾을 수 없어 빈 값으로 설정됨")
+        
         # CSV 파일 읽기 또는 생성
         try:
             df = pd.read_csv(ATTENDANCE_CSV_PATH)
         except Exception as e:
             print(f"CSV 파일 읽기 오류, 새 DataFrame 생성: {e}")
-            df = pd.DataFrame(columns=['name', 'date', 'time', 'tag'])
+            df = pd.DataFrame(columns=['record_id', 'name', 'department', 'position', 'employeeId', 'date', 'time', 'tag'])
+        
+        # record_id 생성 (연속적인 고유 ID)
+        if df.empty:
+            new_record_id = 0
+        else:
+            # 기존 최대 record_id + 1
+            max_id = df['record_id'].max() if 'record_id' in df.columns and not df['record_id'].isna().all() else -1
+            new_record_id = int(max_id) + 1
         
         # 새 기록 추가
         new_row = {
+            'record_id': new_record_id,
             'name': name,
+            'department': department,
+            'position': position,
+            'employeeId': employeeId,
             'date': date_str,
             'time': time_str,
             'tag': tag
@@ -143,7 +212,11 @@ def record_attendance(name):
         
         return {
             'success': True,
+            'record_id': new_record_id,
             'name': name,
+            'department': department,
+            'position': position,
+            'employeeId': employeeId,
             'date': date_str,
             'time': time_str,
             'tag': tag
@@ -156,7 +229,7 @@ def record_attendance(name):
         }
 
 def get_attendance_records(filters=None):
-    """출퇴근 기록 데이터 조회"""
+    """출퇴근 기록 데이터 조회 (record_id 포함)"""
     
     if not os.path.exists(ATTENDANCE_CSV_PATH):
         return []
@@ -167,6 +240,12 @@ def get_attendance_records(filters=None):
         
         # 누락된 값 처리
         df = df.fillna('')
+        
+        # record_id가 없으면 생성
+        if 'record_id' not in df.columns:
+            df['record_id'] = df.index
+            df.to_csv(ATTENDANCE_CSV_PATH, index=False)
+            print("출퇴근 기록에 record_id 컬럼 추가됨")
         
         # 필터링 적용
         if filters:
@@ -215,7 +294,7 @@ def get_attendance_records(filters=None):
         return []
 
 def update_attendance_record(record_id, new_tag):
-    """출퇴근 기록의 태그 업데이트"""
+    """출퇴근 기록의 태그 업데이트 (record_id 기반으로 수정)"""
     try:
         if not os.path.exists(ATTENDANCE_CSV_PATH):
             return {
@@ -229,20 +308,32 @@ def update_attendance_record(record_id, new_tag):
         # 누락된 값 처리
         df = df.fillna('')
         
-        # 인덱스 유효성 검사
-        if record_id < 0 or record_id >= len(df):
+        # record_id로 해당 기록 찾기
+        if 'record_id' not in df.columns:
             return {
                 'success': False,
-                'message': f'ID {record_id}의 출퇴근 기록을 찾을 수 없습니다.'
+                'message': '출퇴근 기록에 record_id가 없습니다. 시스템 관리자에게 문의하세요.'
             }
         
+        # record_id 기반으로 행 찾기
+        target_rows = df[df['record_id'] == record_id]
+        
+        if target_rows.empty:
+            return {
+                'success': False,
+                'message': f'record_id {record_id}에 해당하는 출퇴근 기록을 찾을 수 없습니다.'
+            }
+        
+        # 첫 번째 일치하는 행의 인덱스 가져오기
+        target_index = target_rows.index[0]
+        
         # 이전 값 저장 (안전하게 처리)
-        old_tag = df.loc[record_id, 'tag']
+        old_tag = df.loc[target_index, 'tag']
         if pd.isna(old_tag) or (isinstance(old_tag, float) and np.isnan(old_tag)):
             old_tag = ''
         
         # 태그 업데이트
-        df.loc[record_id, 'tag'] = new_tag
+        df.loc[target_index, 'tag'] = new_tag
         
         # CSV 파일에 저장
         df.to_csv(ATTENDANCE_CSV_PATH, index=False)

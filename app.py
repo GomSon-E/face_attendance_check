@@ -1,4 +1,3 @@
-# app.py - 메인 FastAPI 애플리케이션
 import os
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import FileResponse

@@ -1,5 +1,3 @@
-// static/js/attendance.js
-
 $(document).ready(function() {
     // 요소 참조
     const $nameFilter = $('#nameFilter');
@@ -87,15 +85,15 @@ $(document).ready(function() {
         
         // 태그 저장 버튼 이벤트 위임
         $attendanceTableBody.on('click', '.tag-save-btn', function() {
-            const rowId = $(this).closest('tr').data('id');
+            const recordId = $(this).closest('tr').data('record-id');
             const newTag = $(this).siblings('.tag-select').val();
-            saveTagEdit(rowId, newTag, $(this).closest('td'));
+            saveTagEdit(recordId, newTag, $(this).closest('td'));
         });
         
         // 태그 취소 버튼 이벤트 위임
         $attendanceTableBody.on('click', '.tag-cancel-btn', function() {
-            const rowId = $(this).closest('tr').data('id');
-            const record = cachedData.find(r => r.rowId === rowId);
+            const recordId = $(this).closest('tr').data('record-id');
+            const record = cachedData.find(r => r.record_id == recordId);
             cancelTagEdit($(this).closest('td'), record);
         });
     }
@@ -154,12 +152,6 @@ $(document).ready(function() {
             type: 'GET',
             success: function(response) {
                 if (response.success) {
-                    // 데이터에 행 ID 추가
-                    response.records.forEach((record, index) => {
-                        record.rowId = index;
-                    });
-                    
-                    // 데이터 캐싱
                     cachedData = response.records;
                     
                     displayAttendanceData(response.records);
@@ -190,7 +182,11 @@ $(document).ready(function() {
             // 각 기록을 테이블에 추가
             records.forEach(function(record) {
                 // 안전하게 값 표시하기
+                const recordId = record.record_id || '';
                 const name = record.name || '';
+                const department = record.department || '';
+                const position = record.position || '';
+                const employeeId = record.employeeId || '';
                 const date = record.date || '';
                 const time = record.time || '';
                 const tag = record.tag || '';
@@ -199,8 +195,11 @@ $(document).ready(function() {
                 const tagDisplay = tag || '미지정';
                 
                 const row = `
-                    <tr data-id="${record.rowId}">
+                    <tr data-record-id="${escapeHtml(recordId)}">
                         <td>${escapeHtml(name)}</td>
+                        <td>${escapeHtml(department)}</td>
+                        <td>${escapeHtml(position)}</td>
+                        <td>${escapeHtml(employeeId)}</td>
                         <td>${escapeHtml(date)}</td>
                         <td>${escapeHtml(time)}</td>
                         <td>
@@ -242,21 +241,21 @@ $(document).ready(function() {
     }
     
     // 태그 편집 저장
-    function saveTagEdit(rowId, newTag, $cell) {
+    function saveTagEdit(recordId, newTag, $cell) {
         // 저장 표시기 추가
         $cell.find('.tag-edit-cell').append('<span class="saving-indicator"></span>');
         $cell.find('button, select').prop('disabled', true);
         
         // API 호출
         $.ajax({
-            url: `${API_URL}/api/attendance/${rowId}`,
+            url: `${API_URL}/api/attendance/${recordId}`,
             type: 'PUT',
             contentType: 'application/json',
             data: JSON.stringify({ tag: newTag }),
             success: function(response) {
                 if (response.success) {
                     // 캐시된 데이터 업데이트
-                    const recordIndex = cachedData.findIndex(r => r.rowId === rowId);
+                    const recordIndex = cachedData.findIndex(r => r.record_id == recordId);
                     if (recordIndex !== -1) {
                         cachedData[recordIndex].tag = newTag;
                     }
@@ -319,18 +318,21 @@ $(document).ready(function() {
             success: function(response) {
                 if (response.success && response.records.length > 0) {
                     // CSV 헤더
-                    let csvContent = "이름,날짜,시간,태그\n";
+                    let csvContent = "이름,부서,직급,사번,날짜,시간,태그\n";
                     
                     // CSV 데이터 추가
                     response.records.forEach(function(record) {
                         // 안전하게 값 처리
                         const name = record.name || '';
+                        const department = record.department || '';
+                        const position = record.position || '';
+                        const employeeId = record.employeeId || '';
                         const date = record.date || '';
                         const time = record.time || '';
                         const tag = record.tag || '미지정';
                         
                         // CSV에 안전하게 값 추가 (쉼표, 줄바꿈 등 이스케이프)
-                        csvContent += `"${name.replace(/"/g, '""')}","${date.replace(/"/g, '""')}","${time.replace(/"/g, '""')}","${tag.replace(/"/g, '""')}"\n`;
+                        csvContent += `"${name.replace(/"/g, '""')}","${department.replace(/"/g, '""')}","${position.replace(/"/g, '""')}","${employeeId.replace(/"/g, '""')}","${date.replace(/"/g, '""')}","${time.replace(/"/g, '""')}","${tag.replace(/"/g, '""')}"\n`;
                     });
                     
                     // CSV 파일 다운로드
