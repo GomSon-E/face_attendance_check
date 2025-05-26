@@ -494,27 +494,43 @@ def register_attendance(name, image_data=None):
         # 출퇴근 기록
         result = record_attendance(name)
         
+        # 모든 값을 안전한 타입으로 변환
+        safe_result = {}
+        for key, value in result.items():
+            if isinstance(value, float):
+                import math
+                if math.isnan(value):
+                    safe_result[key] = None
+                elif math.isinf(value):
+                    safe_result[key] = str(value)
+                else:
+                    safe_result[key] = value
+            elif value is None:
+                safe_result[key] = None
+            else:
+                safe_result[key] = str(value) if not isinstance(value, (int, bool)) else value
+        
         # 이미지 데이터가 있으면 얼굴 추가 등록
-        if image_data and result['success']:
+        if image_data and safe_result.get('success'):
             try:
                 # 이미지 추가 등록
                 face_result = process_face_image(name, image_data, {
                     "source": "auto_register",
                     "memo": "출근 시스템에서 자동 등록된 얼굴"
                 })
-                result['face_registered'] = True
-                result['face_registration_details'] = face_result
+                safe_result['face_registered'] = True
+                safe_result['face_registration_details'] = face_result
             except Exception as e:
                 print(f"추가 얼굴 등록 중 오류: {str(e)}")
-                result['face_registered'] = False
-                result['face_registration_error'] = str(e)
+                safe_result['face_registered'] = False
+                safe_result['face_registration_error'] = str(e)
         
-        return result
+        return safe_result
     except Exception as e:
         import traceback
         traceback_str = traceback.format_exc()
         print(f"출퇴근 기록 등록 중 오류: {str(e)}\n{traceback_str}")
         return {
             'success': False,
-            'message': f"출퇴근 기록 등록 중 오류: {str(e)}"
+            'message': str(e)
         }

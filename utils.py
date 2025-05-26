@@ -197,29 +197,30 @@ def record_attendance(name):
         # 새 기록 추가
         new_row = {
             'record_id': new_record_id,
-            'name': name,
-            'department': department,
-            'position': position,
-            'employeeId': employeeId,
+            'name': str(name) if name is not None else '',
+            'department': str(department) if department is not None else '',
+            'position': str(position) if position is not None else '',
+            'employeeId': str(employeeId) if employeeId is not None else '',
             'date': date_str,
             'time': time_str,
-            'tag': tag
+            'tag': str(tag) if tag is not None else ''
         }
         
         # pd.concat 사용
         df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         df.to_csv(ATTENDANCE_CSV_PATH, index=False)
         
+        # 안전한 값으로 반환
         return {
             'success': True,
-            'record_id': new_record_id,
-            'name': name,
-            'department': department,
-            'position': position,
-            'employeeId': employeeId,
+            'record_id': int(new_record_id),
+            'name': str(name) if name is not None else '',
+            'department': str(department) if department is not None else '',
+            'position': str(position) if position is not None else '',
+            'employeeId': str(employeeId) if employeeId is not None else '',
             'date': date_str,
             'time': time_str,
-            'tag': tag
+            'tag': str(tag) if tag is not None else ''
         }
     except Exception as e:
         print(f"출퇴근 기록 저장 오류: {str(e)}")

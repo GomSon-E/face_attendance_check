@@ -57,11 +57,14 @@ def sanitize_json_values(data):
         elif math.isinf(data):
             return str(data)
         return data
-    elif data is None or isinstance(data, (str, int, bool)):
+    elif isinstance(data, (int, bool, str, type(None))):
         return data
     else:
         # 기타 타입은 문자열로 변환
-        return str(data)
+        try:
+            return str(data)
+        except:
+            return None
 
 @app.get("/face_register")
 async def read_root():
@@ -186,10 +189,13 @@ async def register_attendance_api(data: Dict[str, Any] = Body(...)):
         
         result = register_attendance(name, image_data)
         
-        if result['success']:
-            return result
+        # JSON 직렬화를 위해 안전한 값으로 변환
+        sanitized_result = sanitize_json_values(result)
+        
+        if sanitized_result['success']:
+            return sanitized_result
         else:
-            raise HTTPException(status_code=500, detail=result['message'])
+            raise HTTPException(status_code=500, detail=sanitized_result['message'])
     except HTTPException:
         raise
     except Exception as e:
