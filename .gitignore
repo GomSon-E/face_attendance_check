@@ -12,3 +12,5 @@ attendance_records.csv
 
 __pycache__/
 *.pyc
+
+*.pem

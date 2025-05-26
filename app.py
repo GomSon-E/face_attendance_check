@@ -3,10 +3,12 @@ import os
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from typing import Dict, Any
 import json
 import math
+import ssl
 
 # 자체 모듈 임포트
 from config import DATA_DIR, CSV_PATH
@@ -22,6 +24,14 @@ from face_utils import (
 
 # FastAPI 앱 생성
 app = FastAPI(title="얼굴 특징 벡터 추출 및 비교 API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 정적 파일 서빙 (HTML, CSS, JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -279,4 +289,13 @@ async def update_attendance_api(record_id: int, data: Dict[str, Any] = Body(...)
         raise HTTPException(status_code=500, detail=f"출퇴근 기록 수정 중 오류: {str(e)}")
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain('certificate\localhost+4.pem', 'certificate\localhost+4-key.pem')
+    
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        ssl_keyfile="certificate\localhost+4-key.pem",
+        ssl_certfile="certificate\localhost+4.pem"
+    )
