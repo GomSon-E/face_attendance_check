@@ -265,13 +265,29 @@ def get_attendance_records(filters=None):
             if 'employeeId' in filters and filters['employeeId']:
                 df = df[df['employeeId'].str.contains(filters['employeeId'], case=False, na=False)]
             
-            # 날짜 필터 (시작일)
+            # 날짜 필터 수정 (문자열 비교에서 datetime 비교로 변경)
             if 'start_date' in filters and filters['start_date']:
-                df = df[df['date'] >= filters['start_date']]
+                try:
+                    start_date = pd.to_datetime(filters['start_date']).date()
+                    df['date_parsed'] = pd.to_datetime(df['date'], errors='coerce').dt.date
+                    df = df[df['date_parsed'] >= start_date]
+                    print(f"시작일 필터 적용: {start_date} 이후")
+                except Exception as e:
+                    print(f"시작일 파싱 오류: {e}")
             
-            # 날짜 필터 (종료일)
             if 'end_date' in filters and filters['end_date']:
-                df = df[df['date'] <= filters['end_date']]
+                try:
+                    end_date = pd.to_datetime(filters['end_date']).date()
+                    if 'date_parsed' not in df.columns:
+                        df['date_parsed'] = pd.to_datetime(df['date'], errors='coerce').dt.date
+                    df = df[df['date_parsed'] <= end_date]
+                    print(f"종료일 필터 적용: {end_date} 이전")
+                except Exception as e:
+                    print(f"종료일 파싱 오류: {e}")
+            
+            # 임시 컬럼 제거
+            if 'date_parsed' in df.columns:
+                df = df.drop('date_parsed', axis=1)
             
             # 태그 필터
             if 'tag' in filters and filters['tag']:
@@ -280,6 +296,12 @@ def get_attendance_records(filters=None):
                     df = df[df['tag'] == '']
                 else:
                     df = df[df['tag'] == filters['tag']]
+        
+        # 디버깅을 위한 로그
+        if filters:
+            print(f"필터 적용 후 기록 수: {len(df)}")
+            if len(df) > 0:
+                print(f"날짜 범위: {df['date'].min()} ~ {df['date'].max()}")
         
         # 날짜와 시간 기준으로 정렬 (최신순)
         df = df.sort_values(by=['date', 'time'], ascending=[False, False])
