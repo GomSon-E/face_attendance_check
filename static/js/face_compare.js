@@ -895,6 +895,10 @@ function initHamburgerMenu() {
 // 페이지 로드 시 초기화 및 카메라 자동 실행
 function init() {
     console.log("Page initialized.");
+
+    document.addEventListener('click', () => {
+        document.documentElement.requestFullscreen();
+    }, { once: true });
     
     // 결과 팝업 닫기 버튼 이벤트 리스너 연결
     if (popupCloseButton) {
