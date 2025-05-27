@@ -86,6 +86,11 @@ async def statistics_page():
     """출퇴근 통계 페이지 반환"""
     return FileResponse('static/statistics.html')
 
+@app.get("/test_process")
+async def read_root():
+    """테스트 페이지 반환"""
+    return FileResponse('static/test_process.html')
+
 @app.post("/api/capture-face")
 async def capture_face(data: Dict[str, Any] = Body(...)):
     """웹캠에서 캡처한 이미지에서 얼굴 특징 벡터를 추출하고 CSV에 저장"""

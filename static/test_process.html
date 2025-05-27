@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>얼굴 인식 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+        }
+        
+        #imageInput {
+            margin: 10px 0;
+        }
+        
+        #testBtn, #testAllBtn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        #testBtn:hover {
+            background: #0056b3;
+        }
+        
+        #testBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .preview-section {
+            display: none;
+            margin: 20px 0;
+        }
+        
+        .image-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .image-box {
+            text-align: center;
+        }
+        
+        .image-box img {
+            max-width: 300px;
+            max-height: 300px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .image-box h3 {
+            margin: 10px 0 5px 0;
+            color: #333;
+        }
+        
+        .results-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .result-box {
+            background: white;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .result-box h4 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        
+        .result-box pre {
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #hiddenCanvas {
+            display: none;
+        }
+        
+        .download-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .download-btn:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>얼굴 인식 테스트 시스템</h1>
+        
+        <div class="upload-section">
+            <h3>테스트할 이미지를 선택하세요</h3>
+            <input type="file" id="imageInput" accept="image/*" multiple>
+            <div id="fileCount" style="margin: 10px 0; color: #666;"></div>
+            <button id="testBtn">테스트 시작</button>
+            <button id="testAllBtn" style="display: none; margin-left: 10px;">전체 테스트</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>이미지 처리 중...</p>
+        </div>
+        
+        <div class="preview-section" id="previewSection">
+            <h3>이미지 미리보기</h3>
+            <div class="image-container">
+                <div class="image-box">
+                    <h4>원본 이미지</h4>
+                    <img id="originalImage" src="" alt="원본 이미지">
+                </div>
+                <div class="image-box" id="faceImageBox" style="display: none;">
+                    <h4>추출된 얼굴 영역</h4>
+                    <img id="faceImage" src="" alt="얼굴 영역">
+                </div>
+            </div>
+        </div>
+        
+        <div class="results-section" id="resultsSection" style="display: none;">
+            <h3>테스트 결과</h3>
+            <div id="results"></div>
+        </div>
+    </div>
+    
+    <!-- 이미지 처리용 숨겨진 캔버스 -->
+    <canvas id="hiddenCanvas"></canvas>
+    
+    <script>
+        // 설정값
+        const MIN_FACE_RATIO = 0.1;
+        const IMAGE_SCALE_FACTOR = 0.5;
+        
+        // 요소 참조
+        const imageInput = document.getElementById('imageInput');
+        const testBtn = document.getElementById('testBtn');
+        const testAllBtn = document.getElementById('testAllBtn');
+        const fileCount = document.getElementById('fileCount');
+        const loading = document.getElementById('loading');
+        const previewSection = document.getElementById('previewSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const results = document.getElementById('results');
+        const originalImage = document.getElementById('originalImage');
+        const faceImage = document.getElementById('faceImage');
+        const faceImageBox = document.getElementById('faceImageBox');
+        const hiddenCanvas = document.getElementById('hiddenCanvas');
+        
+        // 파일 선택 변경 시
+        imageInput.onchange = function() {
+            const files = this.files;
+            if (files.length > 0) {
+                fileCount.textContent = `${files.length}개 파일 선택됨`;
+                testBtn.style.display = 'inline-block';
+                if (files.length > 1) {
+                    testAllBtn.style.display = 'inline-block';
+                } else {
+                    testAllBtn.style.display = 'none';
+                }
+            } else {
+                fileCount.textContent = '';
+                testBtn.style.display = 'inline-block';
+                testAllBtn.style.display = 'none';
+            }
+        };
+        
+        // 첫 번째 파일만 테스트
+        testBtn.onclick = function() {
+            const files = imageInput.files;
+            if (files.length === 0) {
+                alert('이미지를 선택해주세요');
+                return;
+            }
+            
+            startTest(files[0]);
+        };
+        
+        // 모든 파일 테스트
+        testAllBtn.onclick = function() {
+            const files = imageInput.files;
+            if (files.length === 0) {
+                alert('이미지를 선택해주세요');
+                return;
+            }
+            
+            startBatchTest(Array.from(files));
+        };
+        
+        async function startTest(file) {
+            showLoading(true);
+            clearResults();
+            
+            try {
+                // 파일을 이미지로 로드
+                const originalImageData = await loadImageFromFile(file);
+                
+                // 원본 이미지 표시
+                showOriginalImage(originalImageData.dataUrl);
+                
+                // 1단계: 얼굴 감지
+                addResult('1단계: 얼굴 감지 중...', 'info');
+                const detectResult = await testDetectFace(originalImageData.base64);
+                addResult('얼굴 감지 결과', 'success', detectResult);
+                
+                if (detectResult.success && detectResult.face_detected) {  
+                    // 2단계: 얼굴 비교
+                    addResult('2단계: 얼굴 비교 중...', 'info');
+                    const compareResult = await testCompareFace(originalImageData.base64);
+                    addResult('얼굴 비교 결과', 'success', compareResult);
+                    
+                    // 결과 분석
+                    analyzeCompareResult(compareResult);
+                   
+                } else {
+                    addResult('얼굴이 감지되지 않아 비교 테스트를 건너뜁니다.', 'error');
+                }
+                
+            } catch (error) {
+                console.error('테스트 중 오류:', error);
+                addResult('테스트 중 오류 발생', 'error', {error: error.message});
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function loadImageFromFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const base64 = e.target.result.split(',')[1];
+                        resolve({
+                            image: img,
+                            dataUrl: e.target.result,
+                            base64: base64
+                        });
+                    };
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        async function testDetectFace(imageData) {
+            const response = await fetch('/api/detect-face', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image: imageData})
+            });
+            return await response.json();
+        }
+        
+        async function testCompareFace(imageData) {
+            const response = await fetch('/api/compare-face', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image: imageData})
+            });
+            return await response.json();
+        }
+        
+        function analyzeCompareResult(compareResult) {
+            if (compareResult.success) {
+                if (compareResult.match_type === "high" && compareResult.best_match) {
+                    addResult('✅ 높은 유사도 매치 (0.7 이상)', 'success', {
+                        name: compareResult.best_match.name,
+                        confidence: `${Math.round(compareResult.best_match.confidence * 100)}%`,
+                        department: compareResult.best_match.department,
+                        position: compareResult.best_match.position
+                    });
+                } else if (compareResult.match_type === "medium" && compareResult.candidates) {
+                    addResult('⚠️ 중간 유사도 매치 (0.5-0.7)', 'info', {
+                        candidates_count: compareResult.candidates.length,
+                        candidates: compareResult.candidates.map(c => ({
+                            name: c.name,
+                            confidence: `${Math.round(c.confidence * 100)}%`
+                        }))
+                    });
+                } else {
+                    addResult('❌ 낮은 유사도 (0.5 미만)', 'error', {
+                        message: '일치하는 얼굴을 찾지 못했습니다.'
+                    });
+                }
+            } else {
+                addResult('❌ 얼굴 비교 실패', 'error', compareResult);
+            }
+        }
+        
+        function showOriginalImage(dataUrl) {
+            originalImage.src = dataUrl;
+            previewSection.style.display = 'block';
+        }
+        
+        function showLoading(show) {
+            loading.style.display = show ? 'block' : 'none';
+            testBtn.disabled = show;
+        }
+        
+        function clearResults() {
+            results.innerHTML = '';
+            resultsSection.style.display = 'none';
+            previewSection.style.display = 'none';
+            faceImageBox.style.display = 'none';
+        }
+        
+        function addResult(title, type, data = null) {
+            const resultBox = document.createElement('div');
+            resultBox.className = 'result-box';
+            
+            let content = `<h4>${title}</h4>`;
+            
+            if (data) {
+                content += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            
+            resultBox.innerHTML = content;
+            results.appendChild(resultBox);
+            resultsSection.style.display = 'block';
+            
+            // 자동 스크롤
+            resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // 배치 테스트 함수 추가
+        async function startBatchTest(files) {
+            showLoading(true);
+            clearResults();
+            
+            addResult(`🚀 배치 테스트 시작 - 총 ${files.length}개 파일`, 'info');
+            
+            const results = {
+                total: files.length,
+                success: 0,
+                faceDetected: 0,
+                highMatch: 0,
+                mediumMatch: 0,
+                noMatch: 0,
+                errors: 0,
+                details: []
+            };
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileNum = i + 1;
+                
+                addResult(`📁 [${fileNum}/${files.length}] ${file.name} 처리 중...`, 'info');
+                
+                try {
+                    const fileResult = await testSingleFile(file, fileNum);
+                    results.details.push(fileResult);
+                    
+                    if (fileResult.success) {
+                        results.success++;
+                        if (fileResult.faceDetected) {
+                            results.faceDetected++;
+                            switch (fileResult.matchType) {
+                                case 'high':
+                                    results.highMatch++;
+                                    break;
+                                case 'medium':
+                                    results.mediumMatch++;
+                                    break;
+                                case 'low':
+                                    results.noMatch++;
+                                    break;
+                            }
+                        }
+                    } else {
+                        results.errors++;
+                    }
+                    
+                    // 1초 대기 (서버 부하 방지)
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                } catch (error) {
+                    console.error(`파일 ${file.name} 처리 중 오류:`, error);
+                    results.errors++;
+                    results.details.push({
+                        fileName: file.name,
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+
+            console.log('배치 테스트 결과:', results);
+            
+            // 최종 결과 요약
+            addBatchSummary(results);
+        }
+        
+        async function testSingleFile(file, fileNum) {
+            try {
+                const originalImageData = await loadImageFromFile(file);
+                
+                // 1단계: 얼굴 감지
+                const detectResult = await testDetectFace(originalImageData.base64);
+                
+                const result = {
+                    fileName: file.name,
+                    fileNum: fileNum,
+                    success: true,
+                    detectResult: detectResult,
+                    faceDetected: detectResult.success && detectResult.face_detected,
+                    matchType: null,
+                    compareResult: null,
+                    bestMatch: null,
+                    candidates: null,
+                    error: null
+                };
+                
+                if (result.faceDetected) {
+                    
+                    // 2단계: 얼굴 비교
+                    const compareResult = await testCompareFace(originalImageData.base64);
+                    result.compareResult = compareResult;
+                    
+                    if (compareResult.success) {
+                        result.matchType = compareResult.match_type;
+                        
+                        // 결과별 상세 정보 추가
+                        if (compareResult.match_type === 'high' && compareResult.best_match) {
+                            result.bestMatch = {
+                                name: compareResult.best_match.name,
+                                confidence: compareResult.best_match.confidence
+                            };
+                            addResult(`✅ [${fileNum}] ${file.name}: 높은 유사도 매치 - ${compareResult.best_match.name} (${Math.round(compareResult.best_match.confidence * 100)}%)`, 'success');
+                        } else if (compareResult.match_type === 'medium' && compareResult.candidates) {
+                            result.candidates = compareResult.candidates.map(c => ({
+                                name: c.name,
+                                confidence: c.confidence
+                            }));
+                            addResult(`⚠️ [${fileNum}] ${file.name}: 중간 유사도 매치 - ${compareResult.candidates.length}명 후보`, 'info');
+                        } else {
+                            result.matchType = 'low';
+                            addResult(`❌ [${fileNum}] ${file.name}: 매치 없음`, 'error');
+                        }
+                    } else {
+                        result.error = compareResult.error || '비교 실패';
+                    }
+                } else {
+                    addResult(`😔 [${fileNum}] ${file.name}: 얼굴 감지 실패`, 'error');
+                }
+                
+                return result;
+                
+            } catch (error) {
+                addResult(`💥 [${fileNum}] ${file.name}: 처리 오류 - ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
+        function addBatchSummary(results) {
+            showLoading(false);
+
+            const summary = {
+                '📊 전체 통계': {
+                    '총 파일 수': results.total,
+                    '성공 처리': results.success,
+                    '얼굴 감지 성공': results.faceDetected,
+                    '높은 유사도 매치': results.highMatch,
+                    '중간 유사도 매치': results.mediumMatch,
+                    '매치 없음': results.noMatch,
+                    '오류 발생': results.errors
+                },
+                '📈 성공률': {
+                    '전체 성공률': `${Math.round((results.success / results.total) * 100)}%`,
+                    '얼굴 감지률': `${Math.round((results.faceDetected / results.total) * 100)}%`,
+                    '매치 성공률': results.faceDetected > 0 ? `${Math.round(((results.highMatch + results.mediumMatch) / results.faceDetected) * 100)}%` : '0%'
+                }
+            };
+            
+            addResult('🎯 배치 테스트 완료 - 최종 요약', 'success', summary);
+            
+            // CSV 다운로드 버튼 추가
+            addDownloadCSVButton(results);
+        }
+        
+        function addDownloadCSVButton(results) {
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = '📥 결과를 CSV로 다운로드';
+            downloadBtn.className = 'download-btn';
+            
+            downloadBtn.onclick = function() {
+                downloadResultsAsCSV(results);
+            };
+            
+            resultsSection.appendChild(downloadBtn);
+        }
+        
+        function downloadResultsAsCSV(results) {
+            // UTF-8 BOM을 포함한 CSV 헤더
+            const bom = '\uFEFF';
+            const csvHeaders = ['파일명', '얼굴감지', '매치타입', '매치이름', '유사도', '에러'];
+            const csvRows = [csvHeaders.join(',')];
+            
+            results.details.forEach(detail => {
+                // 각 필드를 안전하게 처리
+                const fileName = `"${detail.fileName || ''}"`;
+                const faceDetected = detail.faceDetected ? 'O' : 'X';
+                const matchType = detail.matchType || '';
+                
+                // 매치 이름 처리
+                let matchName = '';
+                if (detail.bestMatch && detail.bestMatch.name) {
+                    matchName = `"${detail.bestMatch.name}"`;
+                } else if (detail.candidates && detail.candidates.length > 0) {
+                    // 중간 매치의 경우 첫 번째 후보자 이름
+                    matchName = `"${detail.candidates[0].name}"`;
+                }
+                
+                // 유사도 처리
+                let similarity = '';
+                if (detail.bestMatch && detail.bestMatch.confidence !== undefined) {
+                    similarity = Math.round(detail.bestMatch.confidence * 100) + '%';
+                } else if (detail.candidates && detail.candidates.length > 0 && detail.candidates[0].confidence !== undefined) {
+                    similarity = Math.round(detail.candidates[0].confidence * 100) + '%';
+                }
+                
+                // 에러 메시지 처리
+                const errorMsg = detail.error ? `"${detail.error}"` : '';
+                
+                const row = [fileName, faceDetected, matchType, matchName, similarity, errorMsg];
+                csvRows.push(row.join(','));
+            });
+            
+            // BOM을 포함한 CSV 내용 생성
+            const csvContent = bom + csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', `얼굴인식_테스트결과_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // URL 객체 해제
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
