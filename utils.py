@@ -386,3 +386,51 @@ def update_attendance_record(record_id, new_tag):
             'success': False,
             'message': f'출퇴근 기록 업데이트 중 오류: {str(e)}'
         }
+    
+def get_person_info_from_csv(person_name):
+    """CSV에서 특정 인물의 정보 가져오기 (부서, 직책, 사번 포함)"""
+    try:
+        if not os.path.exists(CSV_PATH):
+            print(f"CSV 파일이 존재하지 않음: {CSV_PATH}")
+            return None
+            
+        df = pd.read_csv(CSV_PATH)
+        
+        if df.empty:
+            print("CSV 파일이 비어있음")
+            return None
+            
+        # 이름으로 필터링
+        person_data = df[df['name'] == person_name]
+        
+        if person_data.empty:
+            print(f"'{person_name}' 이름으로 등록된 데이터를 찾을 수 없음")
+            return None
+            
+        # 가장 최근 데이터 사용 (timestamp 기준으로 정렬)
+        if 'timestamp' in person_data.columns:
+            person_data = person_data.sort_values('timestamp', ascending=False)
+            
+        latest_data = person_data.iloc[0]
+        
+        # 안전하게 값 가져오기 (NaN이나 빈 값 처리)
+        def safe_get(value):
+            if pd.isna(value) or value == '' or str(value).lower() == 'nan':
+                return ''
+            return str(value)
+        
+        person_info = {
+            'name': safe_get(latest_data.get('name', '')),
+            'department': safe_get(latest_data.get('department', '')),
+            'position': safe_get(latest_data.get('position', '')),
+            'employeeId': safe_get(latest_data.get('employeeId', ''))
+        }
+        
+        print(f"'{person_name}'의 정보를 성공적으로 가져옴: {person_info}")
+        return person_info
+        
+    except Exception as e:
+        print(f"인물 정보 가져오기 중 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None

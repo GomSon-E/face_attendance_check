@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 
 # 자체 모듈 임포트
 from config import DATA_DIR, FACE_MODEL, DETECTOR_BACKEND, create_path
-from utils import sanitize_filename, vector_to_string, save_to_csv, string_to_vector, record_attendance
+from utils import sanitize_filename, vector_to_string, save_to_csv, string_to_vector, record_attendance, get_person_info_from_csv
 
 # DeepFace 로드
 try:
@@ -429,8 +429,8 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         matches = sorted(matches, key=lambda x: x["confidence"], reverse=True)
         
         # 유사도 기준에 따라 결과 처리
-        # 1. 0.7 이상 유사도: 가장 높은 유사도를 가진 얼굴 하나만 반환
-        high_threshold = 0.7
+        # 1. 0.75 이상 유사도: 가장 높은 유사도를 가진 얼굴 하나만 반환
+        high_threshold = 0.75
         medium_threshold = 0.5
         
         high_matches = [match for match in matches if match["confidence"] >= high_threshold]
@@ -449,7 +449,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
                 "best_match": best_match
             }
         
-        # 2. 0.5 이상 0.7 미만 유사도: 상위 3개 후보 반환
+        # 2. 0.5 이상 0.75 미만 유사도: 상위 3개 후보 반환
         medium_matches = [match for match in matches if high_threshold > match["confidence"] >= medium_threshold]
         if medium_matches:
             # 최대 3개까지만 반환
@@ -488,49 +488,57 @@ def compare_face(image_data: str) -> Dict[str, Any]:
             "message": f"얼굴 비교 중 오류: {str(e)}"
         }
 
-def register_attendance(name, image_data=None):
+def register_attendance(name, image_data=None, user_info=None):
     """출퇴근 기록 등록"""
     try:
         # 출퇴근 기록
         result = record_attendance(name)
         
-        # 모든 값을 안전한 타입으로 변환
-        safe_result = {}
-        for key, value in result.items():
-            if isinstance(value, float):
-                import math
-                if math.isnan(value):
-                    safe_result[key] = None
-                elif math.isinf(value):
-                    safe_result[key] = str(value)
-                else:
-                    safe_result[key] = value
-            elif value is None:
-                safe_result[key] = None
-            else:
-                safe_result[key] = str(value) if not isinstance(value, (int, bool)) else value
-        
         # 이미지 데이터가 있으면 얼굴 추가 등록
-        if image_data and safe_result.get('success'):
+        if image_data and result['success']:
             try:
-                # 이미지 추가 등록
-                face_result = process_face_image(name, image_data, {
+                # 사용자 정보 설정 (프론트엔드에서 전달받은 정보 사용)
+                metadata = {
                     "source": "auto_register",
                     "memo": "출근 시스템에서 자동 등록된 얼굴"
-                })
-                safe_result['face_registered'] = True
-                safe_result['face_registration_details'] = face_result
+                }
+                
+                # user_info가 있으면 해당 정보 사용, 없으면 기존 CSV에서 찾기
+                if user_info:
+                    metadata.update({
+                        "department": user_info.get("department", ""),
+                        "position": user_info.get("position", ""),
+                        "employeeId": user_info.get("employeeId", "")
+                    })
+                    print(f"사용자 정보 직접 전달받음: {user_info}")
+                else:
+                    person_info = get_person_info_from_csv(name)
+                    if person_info:
+                        metadata.update({
+                            "department": person_info.get("department", ""),
+                            "position": person_info.get("position", ""),  
+                            "employeeId": person_info.get("employeeId", "")
+                        })
+                        print(f"CSV에서 사용자 정보 찾음: {person_info}")
+                    else:
+                        print(f"경고: {name}의 사용자 정보를 찾을 수 없음")
+                
+                # 이미지 추가 등록
+                face_result = process_face_image(name, image_data, metadata)
+                result['face_registered'] = True
+                result['face_registration_details'] = face_result
+                print(f"얼굴 추가 등록 성공: {name}")
             except Exception as e:
                 print(f"추가 얼굴 등록 중 오류: {str(e)}")
-                safe_result['face_registered'] = False
-                safe_result['face_registration_error'] = str(e)
+                result['face_registered'] = False
+                result['face_registration_error'] = str(e)
         
-        return safe_result
+        return result
     except Exception as e:
         import traceback
         traceback_str = traceback.format_exc()
         print(f"출퇴근 기록 등록 중 오류: {str(e)}\n{traceback_str}")
         return {
             'success': False,
-            'message': str(e)
+            'message': f"출퇴근 기록 등록 중 오류: {str(e)}"
         }

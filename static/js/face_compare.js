@@ -98,7 +98,7 @@ function captureFrameAndSend() {
     // 캔버스 이미지 데이터를 JPEG Base64 문자열로 가져옵니다.
     const imageData = hiddenCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-     // 얼굴 감지 API로 데이터 전송
+    // 얼굴 감지 API로 데이터 전송
     fetch('/api/detect-face', {
         method: 'POST',
         headers: {
@@ -194,7 +194,7 @@ function captureFrameAndSend() {
                         0, 0, faceWidth, faceHeight,
                         0, 0, compressCanvas.width, compressCanvas.height
                     );
-                    
+
                     // 압축된 얼굴 이미지 데이터를 Base64 문자열로 변환
                     const faceImageData = compressCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
                     
@@ -313,10 +313,10 @@ async function performFaceComparison(faceImageData, finalFaceRatioPercent) {
        // 얼굴 비교 API 응답 처리
        if (data && data.success === true) {
            if (data.match_type === "high" && data.best_match) {
-               // 높은 유사도 (0.7 이상) - 단일 사용자 표시
+               // 높은 유사도 (0.75 이상) - 단일 사용자 표시
                handleHighConfidenceMatch(data.best_match);
            } else if (data.match_type === "medium" && Array.isArray(data.candidates) && data.candidates.length > 0) {
-               // 중간 유사도 (0.5-0.7) - 후보자 목록 표시
+               // 중간 유사도 (0.5-0.75) - 후보자 목록 표시
                handleMediumConfidenceMatches(data.candidates);
            } else {
                // 낮은 유사도 (0.5 미만) - 인식 실패
@@ -350,7 +350,7 @@ async function performFaceComparison(faceImageData, finalFaceRatioPercent) {
     }
 }
 
-// 높은 유사도(0.7 이상) 매치 처리
+// 높은 유사도(0.75 이상) 매치 처리
 function handleHighConfidenceMatch(matchData) {
     if (recognitionStatusElement) { 
         recognitionStatusElement.textContent = `얼굴 인식 성공! (${matchData.name || '일치'}: ${Math.round(matchData.confidence * 100)}%)`;
@@ -396,7 +396,7 @@ function handleHighConfidenceMatch(matchData) {
     showResultPopup();
 }
 
-// 중간 유사도(0.5-0.7) 매치 처리 - 후보자 목록 표시
+// 중간 유사도(0.5-0.75) 매치 처리 - 후보자 목록 표시
 function handleMediumConfidenceMatches(candidates) {
     if (recognitionStatusElement) { 
         recognitionStatusElement.textContent = `유사한 얼굴 ${candidates.length}명 발견`;
@@ -525,13 +525,43 @@ function handleNoMatch(message) {
 // 출근 등록 처리
 async function handleAttendanceRegistration(personName, registerNewFace) {
     try {
+        // 선택된 후보자의 전체 정보 가져오기
+        let selectedCandidateInfo = null;
+        if (registerNewFace && selectedCandidateId !== null) {
+            // 후보자 목록에서 선택된 사용자의 정보 찾기
+            const candidateCards = document.querySelectorAll('.candidate-card');
+            candidateCards.forEach(card => {
+                if (card.dataset.id == selectedCandidateId) {
+                    const nameElement = card.querySelector('.candidate-name');
+                    const detailsElement = card.querySelector('.candidate-details');
+                    
+                    if (nameElement && detailsElement) {
+                        const detailsText = detailsElement.textContent;
+                        const detailsParts = detailsText.split(' / ');
+                        
+                        selectedCandidateInfo = {
+                            name: nameElement.textContent.trim(),
+                            department: detailsParts[0] && detailsParts[0] !== '-' ? detailsParts[0].trim() : '',
+                            position: detailsParts[1] && detailsParts[1] !== '-' ? detailsParts[1].trim() : '',
+                            employeeId: detailsParts[2] && detailsParts[2] !== '-' ? detailsParts[2].trim() : ''
+                        };
+                    }
+                }
+            });
+        }
+        
         const attendanceData = {
             name: personName
         };
         
-        // 새 얼굴 등록이 필요한 경우
-        if (registerNewFace && capturedOriginalImage) {
+        // 새 얼굴 등록이 필요한 경우 - 선택된 사용자의 정보와 함께 전송
+        if (registerNewFace && capturedOriginalImage && selectedCandidateInfo) {
             attendanceData.image = capturedOriginalImage;
+            attendanceData.userInfo = {
+                department: selectedCandidateInfo.department,
+                position: selectedCandidateInfo.position,
+                employeeId: selectedCandidateInfo.employeeId
+            };
         }
         
         const response = await fetch('/api/register-attendance', {
@@ -559,7 +589,6 @@ async function handleAttendanceRegistration(personName, registerNewFace) {
         showAttendanceError(error.message);
     }
 }
-
 // 본인 부정 처리
 function handleIdentityDenial() {
     // 단일 매치 섹션 숨기기

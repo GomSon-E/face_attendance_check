@@ -183,19 +183,21 @@ async def register_attendance_api(data: Dict[str, Any] = Body(...)):
     try:
         name = data.get("name")
         image_data = data.get("image", None)
+        user_info = data.get("userInfo", None)
         
         if not name:
             raise HTTPException(status_code=400, detail="이름이 필요합니다.")
         
-        result = register_attendance(name, image_data)
+        # 사용자 정보 로깅
+        if user_info:
+            print(f"사용자 정보 전달받음: {user_info}")
         
-        # JSON 직렬화를 위해 안전한 값으로 변환
-        sanitized_result = sanitize_json_values(result)
+        result = register_attendance(name, image_data, user_info)
         
-        if sanitized_result['success']:
-            return sanitized_result
+        if result['success']:
+            return result
         else:
-            raise HTTPException(status_code=500, detail=sanitized_result['message'])
+            raise HTTPException(status_code=500, detail=result['message'])
     except HTTPException:
         raise
     except Exception as e:
