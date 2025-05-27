@@ -6,6 +6,7 @@ import pandas as pd
 import base64
 from datetime import datetime
 from fastapi import HTTPException
+import mediapipe as mp
 from typing import Dict, Any, List
 
 # 자체 모듈 임포트
@@ -18,6 +19,22 @@ try:
 except Exception as e:
     print(f"DeepFace 로딩 실패: {e}")
     exit(1)
+
+# MediaPipe Face Mesh 초기화
+try:
+    mp_face_mesh = mp.solutions.face_mesh
+    face_mesh = mp_face_mesh.FaceMesh(
+        static_image_mode=True,
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5
+    )
+    MEDIAPIPE_AVAILABLE = True
+    print("MediaPipe Face Mesh initialized successfully")
+except Exception as e:
+    print(f"Warning: MediaPipe not available: {e}. Using basic face detection.")
+    MEDIAPIPE_AVAILABLE = False
 
 def process_face_image(name, image_data, metadata=None):
     """얼굴 이미지 처리 및 특징 벡터 추출"""
@@ -216,8 +233,162 @@ def calculate_similarity(vector1: np.ndarray, vector2: np.ndarray) -> float:
         print(f"코사인 유사도 계산 중 오류: {str(e)}")
         return 0.0 # 오류 발생 시 기본값 반환
 
+def validate_facial_features_with_mediapipe(img, face_region):
+    """
+    MediaPipe를 사용하여 얼굴의 주요 특징(눈, 코, 입)이 모두 존재하는지 검증
+    """
+    if not MEDIAPIPE_AVAILABLE:
+        return True  # MediaPipe가 없으면 기본 검증을 통과시킴
+    
+    try:
+        # 얼굴 영역 추출
+        x, y, w, h = face_region['x'], face_region['y'], face_region['w'], face_region['h']
+        
+        # 원본 이미지에서 얼굴 영역만 잘라내기
+        face_img = img[y:y+h, x:x+w]
+        
+        if face_img.size == 0:
+            return False
+        
+        # MediaPipe로 얼굴 메시 감지
+        results = face_mesh.process(face_img)
+        
+        if not results.multi_face_landmarks:
+            print("No face landmarks detected by MediaPipe")
+            return False
+        
+        # 첫 번째 얼굴의 landmarks 사용
+        face_landmarks = results.multi_face_landmarks[0]
+        
+        # MediaPipe의 공식 랜드마크 상수들 사용
+        # 이미지 크기
+        h_img, w_img = face_img.shape[:2]
+        
+        # 각 특징 영역의 포인트들을 추출하고 검증
+        def extract_and_validate_feature_by_connections(connections, feature_name, min_unique_points=8):
+            """
+            MediaPipe의 connection 정보를 사용하여 특징 포인트들을 추출하고 검증
+            """
+            try:
+                # connection에서 고유한 포인트 인덱스들을 추출
+                unique_indices = set()
+                for connection in connections:
+                    unique_indices.add(connection[0])
+                    unique_indices.add(connection[1])
+                
+                valid_points = []
+                for idx in unique_indices:
+                    if idx < len(face_landmarks.landmark):
+                        landmark = face_landmarks.landmark[idx]
+                        # 정규화된 좌표를 픽셀 좌표로 변환
+                        x_pixel = int(landmark.x * w_img)
+                        y_pixel = int(landmark.y * h_img)
+                        
+                        # 유효한 범위 내의 포인트만 추가
+                        if 0 <= x_pixel < w_img and 0 <= y_pixel < h_img:
+                            valid_points.append([x_pixel, y_pixel])
+                
+                if len(valid_points) < min_unique_points:
+                    print(f"{feature_name}: insufficient points ({len(valid_points)}/{min_unique_points})")
+                    return False, []
+                
+                valid_points = np.array(valid_points)
+                
+                # 포인트들이 최소한의 영역을 차지하는지 확인 (너무 뭉쳐있지 않은지)
+                if len(valid_points) >= 3:
+                    # 포인트들의 경계 박스 계산
+                    min_x, min_y = np.min(valid_points, axis=0)
+                    max_x, max_y = np.max(valid_points, axis=0)
+                    area = (max_x - min_x) * (max_y - min_y)
+                    
+                    # 특징이 최소한의 크기를 가져야 함
+                    min_area = (w_img * h_img) * 0.005
+                    if area < min_area:
+                        print(f"{feature_name}: area too small ({area:.2f} < {min_area:.2f})")
+                        return False, valid_points
+                    
+                    std_x = np.std(valid_points[:, 0])
+                    std_y = np.std(valid_points[:, 1])
+                    if std_x < 3 or std_y < 3:  # 포인트들이 너무 뭉쳐있으면 거부
+                        print(f"{feature_name}: points too clustered (std_x: {std_x:.2f}, std_y: {std_y:.2f})")
+                        return False, valid_points
+                
+                print(f"{feature_name}: valid ({len(valid_points)} points, area: {area:.2f})")
+                return True, valid_points
+                
+            except Exception as e:
+                print(f"Error validating {feature_name}: {e}")
+                return False, []
+        
+        # MediaPipe의 공식 connection 상수들을 사용하여 각 특징 검증
+        left_eye_valid, left_eye_points = extract_and_validate_feature_by_connections(
+            mp_face_mesh.FACEMESH_LEFT_EYE, "Left eye", 12
+        )
+        
+        right_eye_valid, right_eye_points = extract_and_validate_feature_by_connections(
+            mp_face_mesh.FACEMESH_RIGHT_EYE, "Right eye", 12
+        )
+        
+        nose_valid, nose_points = extract_and_validate_feature_by_connections(
+            mp_face_mesh.FACEMESH_NOSE, "Nose", 16
+        )
+        
+        mouth_valid, mouth_points = extract_and_validate_feature_by_connections(
+            mp_face_mesh.FACEMESH_LIPS, "Mouth", 40
+        )
+        
+        # 모든 주요 특징이 감지되어야만 유효한 얼굴로 인정
+        all_features_valid = left_eye_valid and right_eye_valid and nose_valid and mouth_valid
+        
+        if not all_features_valid:
+            print(f"Feature validation FAILED - Left eye: {left_eye_valid}, Right eye: {right_eye_valid}, Nose: {nose_valid}, Mouth: {mouth_valid}")
+            return False
+        
+        # 추가 검증: 특징들의 상대적 위치가 자연스러운지 확인
+        if (len(left_eye_points) > 0 and len(right_eye_points) > 0 and 
+            len(nose_points) > 0 and len(mouth_points) > 0):
+            
+            left_eye_center = np.mean(left_eye_points, axis=0)
+            right_eye_center = np.mean(right_eye_points, axis=0)
+            nose_center = np.mean(nose_points, axis=0)
+            mouth_center = np.mean(mouth_points, axis=0)
+            
+            # 눈 사이의 거리
+            eye_distance = np.linalg.norm(left_eye_center - right_eye_center)
+            
+            # 코가 두 눈 사이에 적절히 위치하는지 확인
+            eye_midpoint = (left_eye_center + right_eye_center) / 2
+            nose_to_eye_horizontal_distance = abs(nose_center[0] - eye_midpoint[0])
+            
+            # 입이 코보다 아래에 위치하는지 확인
+            nose_mouth_vertical_distance = mouth_center[1] - nose_center[1]
+            
+            # 비율 기반 검증
+            face_width = w_img
+            face_height = h_img
+            
+            # 검증 조건들
+            valid_eye_distance = eye_distance > face_width * 0.15  # 눈 사이 거리가 얼굴 너비의 15% 이상
+            valid_nose_position = nose_to_eye_horizontal_distance < eye_distance * 0.4  # 코가 눈 중앙에서 크게 벗어나지 않음
+            valid_mouth_position = nose_mouth_vertical_distance > face_height * 0.05  # 입이 코보다 아래 위치
+            
+            position_valid = valid_eye_distance and valid_nose_position and valid_mouth_position
+            
+            if not position_valid:
+                print(f"Position validation FAILED - Eye distance: {valid_eye_distance} ({eye_distance:.1f}/{face_width * 0.15:.1f}), "
+                      f"Nose position: {valid_nose_position} ({nose_to_eye_horizontal_distance:.1f}/{eye_distance * 0.4:.1f}), "
+                      f"Mouth position: {valid_mouth_position} ({nose_mouth_vertical_distance:.1f}/{face_height * 0.05:.1f})")
+                return False
+        
+        print("All facial features validated successfully with MediaPipe")
+        return True
+        
+    except Exception as e:
+        print(f"Error in MediaPipe facial feature validation: {str(e)}")
+        return False
+
 def detect_face(image_data: str) -> Dict[str, Any]:
-    """이미지에서 얼굴 감지"""
+    """이미지에서 얼굴 감지 (MediaPipe 기반 완전한 특징 검증 포함)"""
     try:
         # Base64 이미지 데이터 디코딩
         if "base64," in image_data:
@@ -248,7 +419,7 @@ def detect_face(image_data: str) -> Dict[str, Any]:
                 "message": "얼굴이 감지되지 않았습니다."
             }
         
-        # 유효한 얼굴 찾기
+        # 유효한 얼굴 찾기 (MediaPipe로 엄격한 특징 검증)
         valid_faces = []
         frame_area = img.shape[0] * img.shape[1]  # 전체 프레임 면적
         
@@ -259,6 +430,11 @@ def detect_face(image_data: str) -> Dict[str, Any]:
                     # 얼굴 영역이 너무 작거나 이상한 경우 필터링
                     x, y, w, h = facial_area['x'], facial_area['y'], facial_area['w'], facial_area['h']
                     if w <= 10 or h <= 10 or w > img.shape[1]*0.9 or h > img.shape[0]*0.9:
+                        continue
+                    
+                    # MediaPipe로 얼굴 특징 검증
+                    if not validate_facial_features_with_mediapipe(img, facial_area):
+                        print("Face REJECTED: MediaPipe validation failed - missing complete facial features (eyes, nose, mouth)")
                         continue
                     
                     # 얼굴 영역 면적과 비율 계산
@@ -283,7 +459,7 @@ def detect_face(image_data: str) -> Dict[str, Any]:
             return {
                 "success": True,
                 "face_detected": False,
-                "message": "유효한 얼굴이 감지되지 않았습니다."
+                "message": "완전한 얼굴이 감지되지 않았습니다. 눈, 코, 입이 모두 명확하게 보이도록 얼굴을 정면으로 향하게 해주세요."
             }
         
         # 가장 큰 얼굴 선택
@@ -356,7 +532,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
             img_path=img,
             model_name=FACE_MODEL,
             detector_backend=DETECTOR_BACKEND,
-            enforce_detection=False
+            enforce_detection=True
         )
         
         if not embedding_obj or len(embedding_obj) == 0:
