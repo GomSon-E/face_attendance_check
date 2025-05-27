@@ -9,6 +9,7 @@ data_faces/
 
 face_encodings.csv
 attendance_records.csv
+employees.csv
 
 __pycache__/
 *.pyc

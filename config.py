@@ -2,7 +2,10 @@
 
 # 경로 설정 - 상대 경로 사용
 DATA_DIR = "data_faces"
-CSV_PATH = "face_encodings.csv"
+
+# CSV 파일 경로들
+EMPLOYEES_CSV_PATH = "employees.csv"
+FACE_ENCODINGS_CSV_PATH = "face_encodings.csv" 
 ATTENDANCE_CSV_PATH = "attendance_records.csv"
 
 # 얼굴 인식 설정

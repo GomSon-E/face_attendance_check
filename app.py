@@ -11,8 +11,8 @@ import math
 import ssl
 
 # 자체 모듈 임포트
-from config import DATA_DIR, CSV_PATH
-from utils import init_csv_file, init_attendance_csv, get_attendance_records, update_attendance_record
+from config import DATA_DIR
+from utils import init_csv_files, get_attendance_records_with_employee_info, update_attendance_record
 from face_utils import (
     process_face_image, 
     get_all_faces, 
@@ -41,8 +41,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 print(f"데이터 디렉토리 경로: {os.path.abspath(DATA_DIR)}")
 
 # 서버 시작 시 CSV 파일 초기화
-init_csv_file()
-init_attendance_csv()
+init_csv_files()
 
 def sanitize_json_values(data):
     """JSON 직렬화 전에 안전한 값으로 변환"""
@@ -188,16 +187,11 @@ async def register_attendance_api(data: Dict[str, Any] = Body(...)):
     try:
         name = data.get("name")
         image_data = data.get("image", None)
-        user_info = data.get("userInfo", None)
         
         if not name:
             raise HTTPException(status_code=400, detail="이름이 필요합니다.")
         
-        # 사용자 정보 로깅
-        if user_info:
-            print(f"사용자 정보 전달받음: {user_info}")
-        
-        result = register_attendance(name, image_data, user_info)
+        result = register_attendance(name, image_data)
         
         if result['success']:
             return result
@@ -239,7 +233,7 @@ async def get_attendance_api(
             filters = None
         
         # 출퇴근 기록 조회
-        records = get_attendance_records(filters)
+        records = get_attendance_records_with_employee_info(filters)
         
         # JSON 직렬화를 위해 안전한 값으로 변환
         safe_records = []

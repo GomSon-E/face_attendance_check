@@ -11,7 +11,15 @@ from typing import Dict, Any, List
 
 # 자체 모듈 임포트
 from config import DATA_DIR, FACE_MODEL, DETECTOR_BACKEND, create_path
-from utils import sanitize_filename, vector_to_string, save_to_csv, string_to_vector, record_attendance, get_person_info_from_csv
+from utils import (
+    sanitize_filename, 
+    get_or_create_employee, 
+    save_face_encoding, 
+    get_employee_info, 
+    get_all_face_encodings_with_employee_info, 
+    delete_face_encoding, 
+    record_attendance
+)
 
 # DeepFace 로드
 try:
@@ -104,27 +112,35 @@ def process_face_image(name, image_data, metadata=None):
         embedding_vector = embedding_obj[0]["embedding"]
         
         # CSV에 저장
-        save_result = save_to_csv(
-            name=name,
-            department=metadata.get("department", ""),
-            position=metadata.get("position", ""),
-            employeeId=metadata.get("employeeId", ""),
-            image_path=image_path,
-            encoding_vector=np.array(embedding_vector),
-            timestamp=datetime.now().isoformat()
-        )
+        # 1단계: 직원 정보 생성/업데이트
+        department = metadata.get("department", "") if metadata else ""
+        position = metadata.get("position", "") if metadata else ""
+        employeeId = metadata.get("employeeId", "") if metadata else ""
         
-        if not save_result:
-            raise HTTPException(status_code=500, detail="데이터를 CSV 파일에 저장하지 못했습니다.")
+        employee_id = get_or_create_employee(name, department, position, employeeId)
+        if employee_id is None:
+            raise HTTPException(status_code=500, detail="직원 정보 처리에 실패했습니다.")
+        
+        # 2단계: 얼굴 벡터 저장
+        encoding_id = save_face_encoding(employee_id, image_path, np.array(embedding_vector))
+        if encoding_id is None:
+            raise HTTPException(status_code=500, detail="얼굴 벡터를 저장하지 못했습니다.")
         
         # 이미지를 Base64로 인코딩하여 응답
         _, buffer = cv2.imencode('.jpg', img)
         img_base64 = base64.b64encode(buffer).decode('utf-8')
         
+        employee_info = get_employee_info(employee_id=employee_id)
+    
         return {
             "success": True,
             "message": f"{name}의 얼굴 특징 벡터가 성공적으로 추출되어 저장되었습니다.",
+            "employee_id": employee_id,
+            "encoding_id": encoding_id,
             "name": name,
+            "department": employee_info.get('department', ''),
+            "position": employee_info.get('position', ''),
+            "employeeId": employee_info.get('employeeId', ''),
             "image_path": image_path,
             "vector_length": len(embedding_vector),
             "image_base64": img_base64
@@ -146,63 +162,39 @@ def process_face_image(name, image_data, metadata=None):
 
 def get_all_faces():
     """저장된 모든 얼굴 데이터 목록 반환"""
-    from config import CSV_PATH
-    
-    if not os.path.exists(CSV_PATH):
-        return []
-    
-    df = pd.read_csv(CSV_PATH)
+    face_encodings = get_all_face_encodings_with_employee_info()
     faces = []
     
-    for index, row in df.iterrows():
-        image_path = row['image_path']
+    for encoding_data in face_encodings:
+        image_path = encoding_data['image_path']
         if os.path.exists(image_path):
-            try:
-                # 이미지 파일 읽기
-                img = cv2.imread(image_path)
-                if img is not None:
-                    # 이미지를 Base64로 인코딩
-                    _, buffer = cv2.imencode('.jpg', img)
-                    img_base64 = base64.b64encode(buffer).decode('utf-8')
-                    
-                    faces.append({
-                        "id": int(index),
-                        "name": row['name'],
-                        "image_path": image_path,
-                        "timestamp": row['timestamp'],
-                        "image_base64": img_base64
-                    })
-                else:
-                    print(f"경고: 이미지를 읽을 수 없음: {image_path}")
-            except Exception as e:
-                print(f"이미지 {image_path} 처리 중 오류: {str(e)}")
-        else:
-            print(f"경고: 이미지 파일이 존재하지 않음: {image_path}")
+            img = cv2.imread(image_path)
+            if img is not None:
+                _, buffer = cv2.imencode('.jpg', img)
+                img_base64 = base64.b64encode(buffer).decode('utf-8')
+                
+                faces.append({
+                    "id": encoding_data['encoding_id'],          
+                    "employee_id": encoding_data['employee_id'],
+                    "name": encoding_data['name'],
+                    "department": encoding_data['department'], 
+                    "position": encoding_data['position'], 
+                    "employeeId": encoding_data['employeeId'], 
+                    "image_path": image_path,
+                    "image_base64": img_base64
+                })
     
     return faces
 
 def delete_face_data(face_id):
     """특정 얼굴 데이터 삭제"""
-    from config import CSV_PATH
+    result = delete_face_encoding(face_id)  # encoding_id 기반으로 삭제
     
-    df = pd.read_csv(CSV_PATH)
-    if face_id >= len(df):
+    if result:
+        return {"success": True, "message": "얼굴 데이터가 성공적으로 삭제되었습니다."}
+    else:
         raise HTTPException(status_code=404, detail="해당 ID의 얼굴 데이터를 찾을 수 없습니다.")
     
-    # 이미지 파일 삭제
-    image_path = df.loc[face_id, 'image_path']
-    if os.path.exists(image_path):
-        os.remove(image_path)
-        print(f"이미지 파일 삭제됨: {image_path}")
-    else:
-        print(f"경고: 삭제할 이미지 파일이 존재하지 않음: {image_path}")
-    
-    # CSV에서 해당 행 삭제
-    df = df.drop(face_id).reset_index(drop=True)
-    df.to_csv(CSV_PATH, index=False)
-    
-    return {"success": True, "message": "얼굴 데이터가 성공적으로 삭제되었습니다."}
-
 def calculate_similarity(vector1: np.ndarray, vector2: np.ndarray) -> float:
     """두 벡터 간의 코사인 유사도 계산"""
     try:
@@ -500,21 +492,9 @@ def compare_face(image_data: str) -> Dict[str, Any]:
 
     try:
         # CSV 파일 확인
-        from config import CSV_PATH
-        
-        if not os.path.exists(CSV_PATH):
-            return {
-                "success": False,
-                "message": "등록된 얼굴 데이터가 없습니다."
-            }
-        
-        # 등록된 얼굴 데이터 로드
-        df = pd.read_csv(CSV_PATH)
-        if df.empty:
-            return {
-                "success": False,
-                "message": "등록된 얼굴 데이터가 없습니다."
-            }
+        face_encodings = get_all_face_encodings_with_employee_info()
+        if not face_encodings:
+            return {"success": False, "message": "등록된 얼굴 데이터가 없습니다."}
         
         # Base64 이미지 데이터 디코딩
         if "base64," in image_data:
@@ -547,58 +527,37 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         # 각 등록된 얼굴과 비교
         matches = []
 
-        for index, row in df.iterrows():
+        for encoding_data in face_encodings:
             try:
-                # 이미지 파일 존재 여부 확인
-                image_path = row['image_path']
+                image_path = encoding_data['image_path']
                 if not os.path.exists(image_path):
-                    print(f"경고: 이미지 파일이 존재하지 않음: {image_path}")
                     continue
                 
-                # 등록된 얼굴 벡터 가져오기
-                registered_vector = string_to_vector(row['encoding'])
-                
-                # 유사도 계산
+                registered_vector = encoding_data['encoding']
                 similarity = calculate_similarity(embedding_vector, registered_vector)
                 
-                # NaN이나 무한대 값 처리
-                if np.isnan(similarity) or np.isinf(similarity):
-                    similarity = 0.0
-                
-                # 이미지를 Base64로 인코딩
-                try:
-                    registered_img = cv2.imread(image_path)
-                    if registered_img is not None:
-                        _, buffer = cv2.imencode('.jpg', registered_img)
-                        img_base64 = base64.b64encode(buffer).decode('utf-8')
-                    else:
-                        print(f"경고: 이미지를 읽을 수 없음: {image_path}")
-                        continue
-                except Exception as e:
-                    print(f"이미지 인코딩 중 오류: {str(e)}")
+                # 이미지 Base64 인코딩
+                registered_img = cv2.imread(image_path)
+                if registered_img is not None:
+                    _, buffer = cv2.imencode('.jpg', registered_img)
+                    img_base64 = base64.b64encode(buffer).decode('utf-8')
+                else:
                     continue
                 
-                # 값이 존재하는지 확인하고 안전한 값으로 설정
-                name = row.get('name', '')
-                department = row.get('department', '') 
-                position = row.get('position', '')
-                employeeId = row.get('employeeId', '')
-                timestamp = row.get('timestamp', '')
-                
-                # 일치 정보 추가 - 사용자 메타데이터 추가 포함
+                # 일치 정보 추가
                 matches.append({
-                    "id": int(index),
-                    "name": name if isinstance(name, str) else str(name),
-                    "department": department if isinstance(department, str) else str(department),
-                    "position": position if isinstance(position, str) else str(position),
-                    "employeeId": employeeId if isinstance(employeeId, str) else str(employeeId),
-                    "confidence": float(similarity),  # 명시적으로 float으로 변환
+                    "id": encoding_data['encoding_id'],
+                    "employee_id": encoding_data['employee_id'],
+                    "name": encoding_data['name'],
+                    "department": encoding_data['department'],
+                    "position": encoding_data['position'],
+                    "employeeId": encoding_data['employeeId'],
+                    "confidence": float(similarity),
                     "image_path": image_path,
-                    "timestamp": timestamp if isinstance(timestamp, str) else str(timestamp),
                     "image_base64": img_base64
                 })
             except Exception as e:
-                print(f"얼굴 비교 중 오류 (인덱스 {index}): {str(e)}")
+                print(f"얼굴 비교 중 오류: {str(e)}")
                 continue
         
         # 유사도에 따라 정렬
@@ -664,52 +623,45 @@ def compare_face(image_data: str) -> Dict[str, Any]:
             "message": f"얼굴 비교 중 오류: {str(e)}"
         }
 
-def register_attendance(name, image_data=None, user_info=None):
+def register_attendance(name, image_data=None):
     """출퇴근 기록 등록"""
     try:
-        # 출퇴근 기록
-        result = record_attendance(name)
+        # 1. 직원 정보 조회
+        employee_info = get_employee_info(name=name)
+        if not employee_info:
+            return {
+                'success': False,
+                'message': f'등록되지 않은 직원입니다: {name}'
+            }
         
-        # 이미지 데이터가 있으면 얼굴 추가 등록
-        if image_data and result['success']:
-            try:
-                # 사용자 정보 설정 (프론트엔드에서 전달받은 정보 사용)
-                metadata = {
-                    "source": "auto_register",
-                    "memo": "출근 시스템에서 자동 등록된 얼굴"
-                }
-                
-                # user_info가 있으면 해당 정보 사용, 없으면 기존 CSV에서 찾기
-                if user_info:
-                    metadata.update({
-                        "department": user_info.get("department", ""),
-                        "position": user_info.get("position", ""),
-                        "employeeId": user_info.get("employeeId", "")
+        # 2. 출퇴근 기록 저장 (employee_id 사용)
+        result = record_attendance(employee_info['employee_id'])
+        
+        if result['success']:
+            # 3. 결과에 직원 정보 추가
+            result.update({
+                'name': employee_info['name'],
+                'department': employee_info.get('department', ''),
+                'position': employee_info.get('position', ''),
+                'employeeId': employee_info.get('employeeId', '')
+            })
+            
+            # 4. 이미지 데이터가 있으면 얼굴 추가 등록
+            if image_data:
+                try:
+                    face_result = process_face_image(name, image_data, {
+                        "source": "auto_register",
+                        "memo": "출근 시스템에서 자동 등록된 얼굴"
                     })
-                    print(f"사용자 정보 직접 전달받음: {user_info}")
-                else:
-                    person_info = get_person_info_from_csv(name)
-                    if person_info:
-                        metadata.update({
-                            "department": person_info.get("department", ""),
-                            "position": person_info.get("position", ""),  
-                            "employeeId": person_info.get("employeeId", "")
-                        })
-                        print(f"CSV에서 사용자 정보 찾음: {person_info}")
-                    else:
-                        print(f"경고: {name}의 사용자 정보를 찾을 수 없음")
-                
-                # 이미지 추가 등록
-                face_result = process_face_image(name, image_data, metadata)
-                result['face_registered'] = True
-                result['face_registration_details'] = face_result
-                print(f"얼굴 추가 등록 성공: {name}")
-            except Exception as e:
-                print(f"추가 얼굴 등록 중 오류: {str(e)}")
-                result['face_registered'] = False
-                result['face_registration_error'] = str(e)
+                    result['face_registered'] = True
+                    result['face_registration_details'] = face_result
+                except Exception as e:
+                    print(f"추가 얼굴 등록 중 오류: {str(e)}")
+                    result['face_registered'] = False
+                    result['face_registration_error'] = str(e)
         
         return result
+        
     except Exception as e:
         import traceback
         traceback_str = traceback.format_exc()
