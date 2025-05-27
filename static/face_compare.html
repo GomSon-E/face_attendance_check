@@ -7,6 +7,20 @@
     <link rel="stylesheet" href="/static/css/face_compare.css">
 </head>
 <body>
+    <div id="hamburger-menu">
+        <button id="hamburger-btn" class="hamburger-button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav id="hamburger-nav" class="hamburger-nav">
+            <a href="/face_register" class="nav-item">얼굴 등록</a>
+            <a href="/face_compare" class="nav-item active">출퇴근 기록</a>
+            <a href="/attendance" class="nav-item">기록 조회</a>
+            <a href="/statistics" class="nav-item">통계 분석</a>
+        </nav>
+    </div>
+
     <video id="cameraview" playsinline autoplay></video>
     
     <!-- 상태 메시지 컨테이너 및 내부 요소 -->

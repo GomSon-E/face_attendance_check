@@ -862,6 +862,36 @@ function playAudio(type) {
     audio.play()
 }
 
+// 햄버거 메뉴 기능
+function initHamburgerMenu() {
+    const hamburgerBtn = document.getElementById('hamburger-btn');
+    const hamburgerNav = document.getElementById('hamburger-nav');
+    
+    if (hamburgerBtn && hamburgerNav) {
+        hamburgerBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            hamburgerBtn.classList.toggle('active');
+            hamburgerNav.classList.toggle('show');
+        });
+        
+        // 메뉴 외부 클릭 시 닫기
+        document.addEventListener('click', function(e) {
+            if (!document.getElementById('hamburger-menu').contains(e.target)) {
+                hamburgerBtn.classList.remove('active');
+                hamburgerNav.classList.remove('show');
+            }
+        });
+        
+        // ESC 키로 메뉴 닫기
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hamburgerBtn.classList.remove('active');
+                hamburgerNav.classList.remove('show');
+            }
+        });
+    }
+}
+
 // 페이지 로드 시 초기화 및 카메라 자동 실행
 function init() {
     console.log("Page initialized.");
@@ -876,7 +906,10 @@ function init() {
 }
 
 // DOMContentLoaded 이벤트 발생 시 init 함수 호출
-window.addEventListener('DOMContentLoaded', init);
+window.addEventListener('DOMContentLoaded', function() {
+    init();
+    initHamburgerMenu();
+})
 
 // 페이지를 벗어나거나 닫을 때 카메라 스트림 중지
 window.addEventListener('beforeunload', closeCamera);
