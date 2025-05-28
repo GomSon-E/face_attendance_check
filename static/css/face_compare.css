@@ -94,7 +94,9 @@ html, body {
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     max-height: 90vh;
     overflow-y: auto;
+    min-height: auto;
 }
+
 
 /* 팝업 제목 */
 #result-popup-content h2 {
@@ -206,8 +208,7 @@ html, body {
     flex-direction: column;
     gap: 15px;
     margin: 15px 0;
-    max-height: 350px;
-    overflow-y: auto;
+    min-height: 270px;
 }
 
 /* 후보자 카드 */
@@ -220,6 +221,8 @@ html, body {
     padding: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-height: 80px;
+    height: 80px;
 }
 
 .candidate-card:hover {
@@ -240,23 +243,34 @@ html, body {
     object-fit: cover;
     margin-right: 15px;
     border: 2px solid #dee2e6;
+    flex-shrink: 0;
 }
 
 .candidate-info {
     flex: 1;
     text-align: left;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
 }
 
 .candidate-name {
     font-weight: bold;
     font-size: 1.1rem;
     margin: 0 0 5px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .candidate-details {
     color: #666;
     font-size: 0.9rem;
-    margin: 0;
+    margin: 0 0 5px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .similarity-badge {
@@ -266,12 +280,13 @@ html, body {
     padding: 3px 8px;
     font-size: 0.8rem;
     margin-left: 10px;
+    flex-shrink: 0;
 }
 
 /* 후보자 최종 선택 버튼 */
 #confirm-candidate-btn {
     margin-top: 15px;
-    padding: 10px 20px;
+    padding: 12px 20px;
     background-color: #4CAF50;
     color: white;
     border: none;
@@ -280,6 +295,7 @@ html, body {
     font-size: 1rem;
     transition: background-color 0.3s ease;
     width: 100%;
+    height: 45px;
 }
 
 #confirm-candidate-btn:hover {
@@ -446,19 +462,42 @@ html, body {
         width: 100%;
     }
     
+    .candidate-container {
+        gap: 10px;
+        min-height: 240px;
+    }
+
     .candidate-card {
         flex-direction: column;
         text-align: center;
-        padding: 15px;
+        padding: 10px;
+        min-height: 70px;
+        height: auto;
     }
     
     .candidate-image {
+        width: 50px;
+        height: 50px;
         margin-right: 0;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     
     .candidate-info {
         text-align: center;
+    }
+
+    .candidate-name {
+        font-size: 1rem;
+    }
+    
+    .candidate-details {
+        font-size: 0.8rem;
+    }
+    
+    .similarity-badge {
+        margin-left: 0;
+        margin-top: 5px;
+        align-self: center;
     }
 
     #hamburger-menu {
