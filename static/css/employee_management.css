@@ -1,5 +1,3 @@
-/* static/css/employee_management.css */
-
 /* 검색 필터 섹션 */
 .filter-section {
     background-color: white;
@@ -54,12 +52,10 @@
     border-top: 1px solid var(--border-color);
 }
 
-/* 메인 레이아웃 */
+/* 메인 레이아웃 - 고정 높이 제거 */
 .management-layout {
     display: flex;
     gap: 20px;
-    height: calc(100vh - 200px);
-    min-height: 600px;
 }
 
 /* 좌측 직원 목록 섹션 */
@@ -99,9 +95,8 @@
     margin: 0;
     color: var(--primary-dark);
     font-size: 1.3rem;
+    border-bottom: none;
 }
-
-/* 목록 컨트롤 - 제거됨 */
 
 /* 직원 통계 */
 .employee-stats {
@@ -127,7 +122,7 @@
 }
 
 .employee-list {
-    flex: 1;
+    height: 500px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-radius: 6px;
@@ -206,8 +201,6 @@
     margin-left: 8px;
 }
 
-/* 상세 컨트롤 - 제거됨 */
-
 /* 선택 없음 메시지 */
 .no-selection-message {
     display: flex;
@@ -217,6 +210,7 @@
     flex: 1;
     color: var(--secondary-color);
     text-align: center;
+    min-height: 300px;
 }
 
 .no-selection-icon {
@@ -232,8 +226,6 @@
 
 /* 직원 상세 내용 */
 .employee-detail-content {
-    flex: 1;
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -243,26 +235,35 @@
 .info-card, .faces-card {
     background-color: #f8f9fa;
     border-radius: 8px;
-    padding: 20px;
     border: 1px solid var(--border-color);
 }
 
+/* 기본 정보 카드 - 패딩 줄이기 */
+.info-card {
+    padding: 15px;
+}
+
+/* 얼굴 카드 - 패딩 줄이기 */
+.faces-card {
+    padding: 15px;
+}
+
 .info-card h3, .faces-card h3 {
-    margin: 0 0 15px 0;
+    margin: 0 0 12px 0;
     color: var(--primary-dark);
     font-size: 1.1rem;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 8px;
+    padding-bottom: 6px;
 }
 
-/* 정보 헤더 (수정 버튼 포함) */
+/* 정보 헤더 */
 .info-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 8px;
+    padding-bottom: 6px;
 }
 
 .info-header h3 {
@@ -273,14 +274,14 @@
 
 .info-actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
 /* 정보 그리드 */
 .info-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    gap: 12px;
 }
 
 .info-item {
@@ -291,14 +292,14 @@
 .info-item label {
     font-weight: 600;
     color: var(--secondary-color);
-    font-size: 0.9rem;
-    margin-bottom: 5px;
+    font-size: 0.85rem;
+    margin-bottom: 4px;
 }
 
 .info-display {
     color: var(--text-color);
-    font-size: 1rem;
-    padding: 8px 12px;
+    font-size: 0.95rem;
+    padding: 6px 10px;
     background-color: white;
     border-radius: 4px;
     border: 1px solid #ddd;
@@ -306,8 +307,8 @@
 
 .info-edit {
     color: var(--text-color);
-    font-size: 1rem;
-    padding: 8px 12px;
+    font-size: 0.95rem;
+    padding: 6px 10px;
     background-color: white;
     border-radius: 4px;
     border: 2px solid var(--primary-color);
@@ -324,18 +325,48 @@
 .faces-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-auto-rows: 120px;
     gap: 15px;
     margin-top: 10px;
+    height: 200px;
+    overflow-y: auto;
+    padding: 5px;
+    align-items: start;
+}
+
+/* 스크롤바 스타일링 */
+.faces-grid::-webkit-scrollbar,
+.employee-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.faces-grid::-webkit-scrollbar-track,
+.employee-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.faces-grid::-webkit-scrollbar-thumb,
+.employee-list::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.faces-grid::-webkit-scrollbar-thumb:hover,
+.employee-list::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
 }
 
 .face-item {
     position: relative;
-    aspect-ratio: 1;
+    width: 100%;
+    height: 120px;
     border-radius: 8px;
     overflow: hidden;
     border: 2px solid var(--border-color);
     cursor: pointer;
     transition: all 0.2s ease;
+    display: block;
 }
 
 .face-item:hover {
@@ -402,8 +433,6 @@
     font-style: italic;
     padding: 20px;
 }
-
-/* 통계 그리드 - 제거됨 */
 
 /* 모달 오버레이 */
 .modal-overlay {
@@ -582,17 +611,14 @@
     
     .management-layout {
         flex-direction: column;
-        height: auto;
-        min-height: auto;
     }
     
     .employee-list-section {
         max-width: none;
-        height: 300px;
     }
     
-    .employee-detail-section {
-        height: auto;
+    .employee-list {
+        height: 300px;
     }
     
     .section-header {
@@ -616,12 +642,22 @@
     
     .faces-grid {
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        grid-auto-rows: 100px;
         gap: 10px;
+        height: 150px;
+    }
+    
+    .face-item {
+        height: 100px;
     }
     
     .modal-content {
         width: 95%;
         margin: 20px;
+    }
+    
+    .no-selection-message {
+        min-height: 200px;
     }
 }
 
@@ -638,13 +674,18 @@
     
     .faces-grid {
         grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        height: 120px;
     }
     
-    .list-actions {
-        flex-direction: column;
+    .employee-list {
+        height: 250px;
     }
     
     .modal-header, .modal-body, .modal-footer {
         padding: 15px;
+    }
+    
+    .no-selection-message {
+        min-height: 150px;
     }
 }
