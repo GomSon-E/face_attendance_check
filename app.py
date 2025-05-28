@@ -12,7 +12,16 @@ import ssl
 
 # 자체 모듈 임포트
 from config import DATA_DIR
-from utils import init_csv_files, get_attendance_records_with_employee_info, update_attendance_record
+from utils import (
+    init_csv_files, 
+    get_attendance_records_with_employee_info, 
+    update_attendance_record, 
+    get_employee_info, 
+    get_all_employees, 
+    get_face_encodings_by_employee, 
+    update_employee_info, 
+    get_employee_faces_with_base64
+)
 from face_utils import (
     process_face_image, 
     get_all_faces, 
@@ -89,6 +98,11 @@ async def statistics_page():
 async def read_root():
     """테스트 페이지 반환"""
     return FileResponse('static/test_process.html')
+
+@app.get("/employee_management")
+async def employee_management_page():
+    """직원 관리 페이지 반환"""
+    return FileResponse('static/employee_management.html')
 
 @app.post("/api/capture-face")
 async def capture_face(data: Dict[str, Any] = Body(...)):
@@ -294,6 +308,113 @@ async def update_attendance_api(record_id: int, data: Dict[str, Any] = Body(...)
         traceback_str = traceback.format_exc()
         print(f"출퇴근 기록 수정 중 오류: {str(e)}\n{traceback_str}")
         raise HTTPException(status_code=500, detail=f"출퇴근 기록 수정 중 오류: {str(e)}")
+
+@app.get("/api/employees")
+async def get_all_employees_api(
+    name: str = None,
+    department: str = None,
+    position: str = None,
+    employeeId: str = None
+):
+    """모든 직원 정보와 얼굴 개수를 함께 조회 (검색 필터 지원)"""
+    try:
+        # 직원 정보 조회
+        employees = get_all_employees()
+        
+        # 검색 필터 적용
+        if name:
+            employees = [emp for emp in employees if name.lower() in (emp.get('name', '') or '').lower()]
+        if department:
+            employees = [emp for emp in employees if department.lower() in (emp.get('department', '') or '').lower()]
+        if position:
+            employees = [emp for emp in employees if position.lower() in (emp.get('position', '') or '').lower()]
+        if employeeId:
+            employees = [emp for emp in employees if employeeId.lower() in (emp.get('employeeId', '') or '').lower()]
+        
+        # 각 직원의 얼굴 개수 조회
+        for employee in employees:
+            face_encodings = get_face_encodings_by_employee(employee['employee_id'])
+            employee['face_count'] = len(face_encodings)
+        
+        return {
+            "success": True,
+            "employees": employees,
+            "total": len(employees)
+        }
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"직원 목록 조회 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"직원 목록 조회 중 오류: {str(e)}")
+
+@app.put("/api/employees/{employee_id}")
+async def update_employee_api(employee_id: int, data: Dict[str, Any] = Body(...)):
+    """직원 정보 수정"""
+    try:
+        # 기존 직원 확인
+        existing_employee = get_employee_info(employee_id=employee_id)
+        if not existing_employee:
+            raise HTTPException(status_code=404, detail="해당 직원을 찾을 수 없습니다.")
+        
+        name = data.get("name", "").strip()
+        department = data.get("department", "").strip()
+        position = data.get("position", "").strip()
+        employeeId = data.get("employeeId", "").strip()
+        
+        if not name:
+            raise HTTPException(status_code=400, detail="이름은 필수 입력 항목입니다.")
+        
+        # 다른 직원과 이름 중복 체크
+        name_duplicate = get_employee_info(name=name)
+        if name_duplicate and name_duplicate['employee_id'] != employee_id:
+            raise HTTPException(status_code=400, detail="이미 사용 중인 이름입니다.")
+        
+        # 직원 정보 업데이트
+        result = update_employee_info(employee_id, name, department, position, employeeId)
+        
+        if result['success']:
+            updated_employee = get_employee_info(employee_id=employee_id)
+            return {
+                "success": True,
+                "message": "직원 정보가 성공적으로 수정되었습니다.",
+                "employee": updated_employee
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result.get('message', '직원 정보 수정에 실패했습니다.'))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"직원 정보 수정 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"직원 정보 수정 중 오류: {str(e)}")
+
+@app.get("/api/employees/{employee_id}/faces")
+async def get_employee_faces_api(employee_id: int):
+    """특정 직원의 모든 얼굴 이미지 조회"""
+    try:
+        # 직원 존재 확인
+        employee = get_employee_info(employee_id=employee_id)
+        if not employee:
+            raise HTTPException(status_code=404, detail="해당 직원을 찾을 수 없습니다.")
+        
+        # 얼굴 이미지들 조회 (Base64 포함)
+        faces = get_employee_faces_with_base64(employee_id)
+        
+        return {
+            "success": True,
+            "faces": faces,
+            "total": len(faces)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"직원 얼굴 이미지 조회 중 오류: {str(e)}\n{traceback_str}")
+        raise HTTPException(status_code=500, detail=f"직원 얼굴 이미지 조회 중 오류: {str(e)}")
 
 if __name__ == "__main__":
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>직원 관리 시스템</title>
+    <link rel="stylesheet" href="/static/css/face_register.css">
+    <link rel="stylesheet" href="/static/css/employee_management.css">
+    <script src="/static/js/jquery-3.6.0.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>직원 관리 시스템</h1>
+            <p>등록된 직원 정보를 조회, 수정할 수 있습니다.</p>
+            <nav class="navigation">
+                <a href="/face_register" class="nav-link">얼굴 등록</a>
+                <a href="/face_compare" class="nav-link">출퇴근 기록</a>
+                <a href="/attendance" class="nav-link">기록 조회</a>
+                <a href="/statistics" class="nav-link">통계 분석</a>
+                <a href="/employee_management" class="nav-link active">직원 관리</a>
+            </nav>
+        </header>
+
+        <!-- 상단 검색 필터 섹션 -->
+        <div class="filter-section">
+            <h2>직원 검색</h2>
+            <div class="filter-form">
+                <div class="filter-group">
+                    <label for="nameFilter">이름</label>
+                    <input type="text" id="nameFilter" placeholder="이름 검색">
+                </div>
+                <div class="filter-group">
+                    <label for="departmentFilter">부서</label>
+                    <input type="text" id="departmentFilter" placeholder="부서 검색">
+                </div>
+                <div class="filter-group">
+                    <label for="positionFilter">직급</label>
+                    <input type="text" id="positionFilter" placeholder="직급 검색">
+                </div>
+                <div class="filter-group">
+                    <label for="employeeIdFilter">사번</label>
+                    <input type="text" id="employeeIdFilter" placeholder="사번 검색">
+                </div>
+                <div class="filter-actions">
+                    <button id="searchBtn" class="primary-btn">검색</button>
+                    <button id="resetFiltersBtn" class="secondary-btn">초기화</button>
+                </div>
+            </div>
+        </div>
+
+        <main class="management-layout">
+            <!-- 좌측: 직원 목록 섹션 -->
+            <div class="employee-list-section">
+                <div class="section-header">
+                    <h2>직원 목록</h2>
+                </div>
+                
+                <div class="employee-stats">
+                    <span>총 <span id="totalEmployees">0</span>명의 직원</span>
+                </div>
+                
+                <div class="employee-list-container">
+                    <div class="employee-list" id="employeeList">
+                        <!-- 직원 목록이 여기에 동적으로 생성됩니다 -->
+                    </div>
+                    <div id="emptyEmployeeMessage" class="empty-message">등록된 직원이 없습니다.</div>
+                </div>
+            </div>
+
+            <!-- 우측: 직원 상세 정보 섹션 -->
+            <div class="employee-detail-section">
+                <div class="section-header">
+                    <h2>직원 상세 정보</h2>
+                </div>
+                
+                <!-- 선택된 직원이 없을 때 -->
+                <div id="noSelectionMessage" class="no-selection-message">
+                    <div class="no-selection-icon">👤</div>
+                    <p>직원을 선택하면 상세 정보가 표시됩니다.</p>
+                </div>
+                
+                <!-- 직원 정보 표시 영역 -->
+                <div id="employeeDetailContent" class="employee-detail-content hidden">
+                    <!-- 기본 정보 (편집 가능) -->
+                    <div class="info-card">
+                        <div class="info-header">
+                            <h3>기본 정보</h3>
+                            <div class="info-actions">
+                                <button id="editToggleBtn" class="primary-btn">수정</button>
+                                <button id="saveBtn" class="success-btn hidden">저장</button>
+                                <button id="cancelBtn" class="secondary-btn hidden">취소</button>
+                            </div>
+                        </div>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>이름:</label>
+                                <span id="detailName" class="info-display">-</span>
+                                <input type="text" id="editName" class="info-edit hidden">
+                            </div>
+                            <div class="info-item">
+                                <label>부서:</label>
+                                <span id="detailDepartment" class="info-display">-</span>
+                                <input type="text" id="editDepartment" class="info-edit hidden">
+                            </div>
+                            <div class="info-item">
+                                <label>직급:</label>
+                                <span id="detailPosition" class="info-display">-</span>
+                                <input type="text" id="editPosition" class="info-edit hidden">
+                            </div>
+                            <div class="info-item">
+                                <label>사번:</label>
+                                <span id="detailEmployeeId" class="info-display">-</span>
+                                <input type="text" id="editEmployeeIdField" class="info-edit hidden">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 얼굴 이미지 -->
+                    <div class="faces-card">
+                        <h3>등록된 얼굴 이미지 (<span id="faceCount">0</span>장)</h3>
+                        <div class="faces-grid" id="facesGrid">
+                            <!-- 얼굴 이미지들이 여기에 동적으로 생성됩니다 -->
+                        </div>
+                        <div id="noFacesMessage" class="no-faces-message">
+                            등록된 얼굴 이미지가 없습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 얼굴 이미지 확대 모달 -->
+        <div id="faceModal" class="modal-overlay hidden">
+            <div class="face-modal-content">
+                <div class="face-modal-header">
+                    <h3 id="faceModalTitle">얼굴 이미지</h3>
+                    <button id="closeFaceModalBtn" class="close-btn">×</button>
+                </div>
+                <div class="face-modal-body">
+                    <img id="faceModalImage" src="" alt="얼굴 이미지">
+                    <div class="face-modal-actions">
+                        <button id="deleteFaceBtn" class="danger-btn">이 이미지 삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 로딩 스피너 -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>처리 중...</p>
+            </div>
+        </div>
+
+        <div id="statusBar" class="status-bar">
+            <div id="statusMessage">준비 완료</div>
+        </div>
+    </div>
+
+    <script src="/static/js/employee_management.js"></script>
+</body>
+</html>

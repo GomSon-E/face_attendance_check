@@ -138,6 +138,45 @@ def get_all_employees():
         print(f"전체 직원 정보 조회 중 오류: {str(e)}")
         return []
 
+def update_employee_info(employee_id, name, department="", position="", employeeId=""):
+    """직원 정보 업데이트"""
+    try:
+        df = pd.read_csv(EMPLOYEES_CSV_PATH)
+        
+        # 해당 직원 찾기
+        target_rows = df[df['employee_id'] == employee_id]
+        
+        if target_rows.empty:
+            return {
+                'success': False,
+                'message': f'직원 ID {employee_id}를 찾을 수 없습니다.'
+            }
+        
+        # 첫 번째 일치하는 행의 인덱스 가져오기
+        target_index = target_rows.index[0]
+        
+        # 정보 업데이트
+        df.loc[target_index, 'name'] = name
+        df.loc[target_index, 'department'] = department
+        df.loc[target_index, 'position'] = position
+        df.loc[target_index, 'employeeId'] = employeeId
+        
+        # CSV 파일에 저장
+        df.to_csv(EMPLOYEES_CSV_PATH, index=False)
+        
+        return {
+            'success': True,
+            'message': '직원 정보가 성공적으로 업데이트되었습니다.',
+            'employee_id': employee_id
+        }
+        
+    except Exception as e:
+        print(f"직원 정보 업데이트 중 오류: {str(e)}")
+        return {
+            'success': False,
+            'message': f'직원 정보 업데이트 중 오류: {str(e)}'
+        }
+
 # === 얼굴 벡터 관리 함수들 ===
 
 def save_face_encoding(employee_id, image_path, encoding_vector):
@@ -239,6 +278,39 @@ def delete_face_encoding(encoding_id):
     except Exception as e:
         print(f"얼굴 벡터 삭제 중 오류: {str(e)}")
         return False
+    
+def get_employee_faces_with_base64(employee_id):
+    """특정 직원의 얼굴 이미지들을 Base64와 함께 조회"""
+    import cv2
+    import base64
+    
+    try:
+        face_encodings = get_face_encodings_by_employee(employee_id)
+        faces = []
+        
+        for encoding_data in face_encodings:
+            image_path = encoding_data['image_path']
+            if os.path.exists(image_path):
+                try:
+                    img = cv2.imread(image_path)
+                    if img is not None:
+                        _, buffer = cv2.imencode('.jpg', img)
+                        img_base64 = base64.b64encode(buffer).decode('utf-8')
+                        
+                        faces.append({
+                            "id": encoding_data['encoding_id'],
+                            "image_path": image_path,
+                            "image_base64": img_base64
+                        })
+                except Exception as e:
+                    print(f"이미지 로드 오류 ({image_path}): {str(e)}")
+                    continue
+        
+        return faces
+        
+    except Exception as e:
+        print(f"얼굴 이미지 조회 중 오류: {str(e)}")
+        return []
 
 # === 출퇴근 기록 관리 함수들 ===
 
