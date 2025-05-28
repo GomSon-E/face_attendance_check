@@ -54,10 +54,23 @@ init_csv_files()
 
 def sanitize_json_values(data):
     """JSON 직렬화 전에 안전한 값으로 변환"""
+    import numpy as np
+    import pandas as pd
+    
     if isinstance(data, dict):
         return {k: sanitize_json_values(v) for k, v in data.items()}
     elif isinstance(data, list):
         return [sanitize_json_values(item) for item in data]
+    elif isinstance(data, np.integer):
+        return int(data)
+    elif isinstance(data, np.floating):
+        if np.isnan(data):
+            return None
+        elif np.isinf(data):
+            return str(data)
+        return float(data)
+    elif isinstance(data, np.ndarray):
+        return data.tolist()
     elif isinstance(data, float):
         import math
         if math.isnan(data):
@@ -65,6 +78,8 @@ def sanitize_json_values(data):
         elif math.isinf(data):
             return str(data)
         return data
+    elif pd.isna(data):
+        return None
     elif isinstance(data, (int, bool, str, type(None))):
         return data
     else:
@@ -184,7 +199,6 @@ async def compare_face_api(data: Dict[str, Any] = Body(...)):
             raise HTTPException(status_code=400, detail="이미지 데이터가 필요합니다.")
         
         result = compare_face(image_data)
-        # JSON 직렬화를 위해 안전한 값으로 변환
         sanitized_result = sanitize_json_values(result)
         return sanitized_result
     except HTTPException:

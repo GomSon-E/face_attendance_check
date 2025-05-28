@@ -7,6 +7,23 @@ import json
 import datetime
 from config import EMPLOYEES_CSV_PATH, FACE_ENCODINGS_CSV_PATH, ATTENDANCE_CSV_PATH, ATTENDANCE_TIMES
 
+def convert_to_python_types(obj):
+    """numpy 타입을 Python 기본 타입으로 변환"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_to_python_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_python_types(item) for item in obj]
+    elif pd.isna(obj):
+        return None
+    else:
+        return obj
+
 def init_csv_files():
     """모든 CSV 파일 초기화 함수"""
     init_employees_csv()
@@ -88,7 +105,7 @@ def get_or_create_employee(name, department="", position="", employeeId=""):
             return int(employee_id)
         else:
             # 새 직원 생성
-            new_employee_id = df['employee_id'].max() + 1 if not df.empty else 1
+            new_employee_id = int(df['employee_id'].max() + 1) if not df.empty else 1
             
             new_row = {
                 'employee_id': new_employee_id,
@@ -123,7 +140,8 @@ def get_employee_info(employee_id=None, name=None):
         if employee.empty:
             return None
         
-        return employee.iloc[0].to_dict()
+        result = employee.iloc[0].to_dict()
+        return convert_to_python_types(result)
         
     except Exception as e:
         print(f"직원 정보 조회 중 오류: {str(e)}")
@@ -133,7 +151,9 @@ def get_all_employees():
     """모든 직원 정보 조회"""
     try:
         df = pd.read_csv(EMPLOYEES_CSV_PATH)
-        return df.to_dict('records')
+        records = df.to_dict('records')
+        # numpy 타입을 Python 기본 타입으로 변환
+        return [convert_to_python_types(record) for record in records]
     except Exception as e:
         print(f"전체 직원 정보 조회 중 오류: {str(e)}")
         return []
@@ -167,7 +187,7 @@ def update_employee_info(employee_id, name, department="", position="", employee
         return {
             'success': True,
             'message': '직원 정보가 성공적으로 업데이트되었습니다.',
-            'employee_id': employee_id
+            'employee_id': int(employee_id)
         }
         
     except Exception as e:
@@ -184,11 +204,11 @@ def save_face_encoding(employee_id, image_path, encoding_vector):
     try:
         df = pd.read_csv(FACE_ENCODINGS_CSV_PATH)
         
-        new_encoding_id = df['encoding_id'].max() + 1 if not df.empty else 1
+        new_encoding_id = int(df['encoding_id'].max() + 1) if not df.empty else 1
         
         new_row = {
             'encoding_id': new_encoding_id,
-            'employee_id': employee_id,
+            'employee_id': int(employee_id),  # numpy 타입 방지
             'image_path': image_path,
             'encoding': vector_to_string(encoding_vector)
         }
@@ -211,8 +231,8 @@ def get_face_encodings_by_employee(employee_id):
         results = []
         for _, row in encodings.iterrows():
             results.append({
-                'encoding_id': row['encoding_id'],
-                'employee_id': row['employee_id'],
+                'encoding_id': int(row['encoding_id']),
+                'employee_id': int(row['employee_id']),
                 'image_path': row['image_path'],
                 'encoding': string_to_vector(row['encoding'])
             })
@@ -237,8 +257,8 @@ def get_all_face_encodings_with_employee_info():
         results = []
         for _, row in merged_df.iterrows():
             results.append({
-                'encoding_id': row['encoding_id'],
-                'employee_id': row['employee_id'],
+                'encoding_id': int(row['encoding_id']),
+                'employee_id': int(row['employee_id']),
                 'name': row['name'],
                 'department': row.get('department', ''),
                 'position': row.get('position', ''),
@@ -298,7 +318,7 @@ def get_employee_faces_with_base64(employee_id):
                         img_base64 = base64.b64encode(buffer).decode('utf-8')
                         
                         faces.append({
-                            "id": encoding_data['encoding_id'],
+                            "id": int(encoding_data['encoding_id']),
                             "image_path": image_path,
                             "image_base64": img_base64
                         })
@@ -343,12 +363,12 @@ def record_attendance(employee_id):
         df = pd.read_csv(ATTENDANCE_CSV_PATH)
         
         # record_id 생성
-        new_record_id = df['record_id'].max() + 1 if not df.empty else 1
+        new_record_id = int(df['record_id'].max() + 1) if not df.empty else 1
         
         # 새 기록 추가
         new_row = {
             'record_id': new_record_id,
-            'employee_id': employee_id,
+            'employee_id': int(employee_id),
             'date': date_str,
             'time': time_str,
             'tag': tag
@@ -360,7 +380,7 @@ def record_attendance(employee_id):
         return {
             'success': True,
             'record_id': new_record_id,
-            'employee_id': employee_id,
+            'employee_id': int(employee_id),
             'date': date_str,
             'time': time_str,
             'tag': tag
@@ -437,25 +457,13 @@ def get_attendance_records_with_employee_info(filters=None):
         # 날짜와 시간 기준으로 정렬 (최신순)
         merged_df = merged_df.sort_values(by=['date', 'time'], ascending=[False, False])
         
-        # 안전한 값으로 변환
-        def safe_value(val):
-            if pd.isna(val) or (isinstance(val, float) and np.isnan(val)):
-                return ''
-            elif isinstance(val, float) and np.isinf(val):
-                return 'Infinity' if val > 0 else '-Infinity'
-            return val
-        
-        merged_df_safe = merged_df.copy()
-        for col in merged_df_safe.columns:
-            merged_df_safe[col] = merged_df_safe[col].apply(safe_value)
-        
         # 필요한 컬럼만 선택
         result_columns = ['record_id', 'employee_id', 'name', 'department', 'position', 'employeeId', 'date', 'time', 'tag']
-        available_columns = [col for col in result_columns if col in merged_df_safe.columns]
+        available_columns = [col for col in result_columns if col in merged_df.columns]
         
-        records = merged_df_safe[available_columns].to_dict('records')
+        records = merged_df[available_columns].to_dict('records')
         
-        return records
+        return [convert_to_python_types(record) for record in records]
         
     except Exception as e:
         print(f"출퇴근 기록 조회 중 오류: {str(e)}")

@@ -640,13 +640,16 @@ def register_attendance(name, image_data=None):
         if result['success']:
             # 3. 결과에 직원 정보 추가
             result.update({
-                'name': employee_info['name'],
-                'department': employee_info.get('department', ''),
-                'position': employee_info.get('position', ''),
-                'employeeId': employee_info.get('employeeId', '')
+                'name': str(employee_info['name']),
+                'department': str(employee_info.get('department', '')),
+                'position': str(employee_info.get('position', '')),
+                'employeeId': str(employee_info.get('employeeId', ''))
             })
             
-            # 4. 이미지 데이터가 있으면 얼굴 추가 등록
+            result['record_id'] = int(result['record_id'])
+            result['employee_id'] = int(result['employee_id'])
+            
+            # 5. 이미지 데이터가 있으면 얼굴 추가 등록
             if image_data:
                 try:
                     face_result = process_face_image(name, image_data, {
