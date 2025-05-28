@@ -566,7 +566,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         # 유사도 기준에 따라 결과 처리
         # 1. 0.75 이상 유사도: 가장 높은 유사도를 가진 얼굴 하나만 반환
         high_threshold = 0.75
-        medium_threshold = 0.5
+        medium_threshold = 0.6
         
         high_matches = [match for match in matches if match["confidence"] >= high_threshold]
         if high_matches:
@@ -584,7 +584,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
                 "best_match": best_match
             }
         
-        # 2. 0.5 이상 0.75 미만 유사도: 상위 3개 후보 반환
+        # 2. 0.6 이상 0.75 미만 유사도: 상위 3개 후보 반환
         medium_matches = [match for match in matches if high_threshold > match["confidence"] >= medium_threshold]
         if medium_matches:
             # 최대 3개까지만 반환
@@ -602,7 +602,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
                 "total_candidates": len(candidates)
             }
         
-        # 3. 0.5 미만 유사도: 아무것도 반환하지 않음 (인식 실패)
+        # 3. 0.6 미만 유사도: 아무것도 반환하지 않음 (인식 실패)
         timestamp_face_compare_end = datetime.now()
         print('Timestamp - Face Compare End (Low):', timestamp_face_compare_end)
         time_diff = timestamp_face_compare_end - timestamp_face_compare_start

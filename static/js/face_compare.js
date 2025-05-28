@@ -316,10 +316,10 @@ async function performFaceComparison(faceImageData, finalFaceRatioPercent) {
                // 높은 유사도 (0.75 이상) - 단일 사용자 표시
                handleHighConfidenceMatch(data.best_match);
            } else if (data.match_type === "medium" && Array.isArray(data.candidates) && data.candidates.length > 0) {
-               // 중간 유사도 (0.5-0.75) - 후보자 목록 표시
+               // 중간 유사도 (0.6-0.75) - 후보자 목록 표시
                handleMediumConfidenceMatches(data.candidates);
            } else {
-               // 낮은 유사도 (0.5 미만) - 인식 실패
+               // 낮은 유사도 (0.6 미만) - 인식 실패
                handleNoMatch("등록된 얼굴 중에 일치하는 얼굴을 찾지 못했습니다.");
            }
        } else {
@@ -396,7 +396,7 @@ function handleHighConfidenceMatch(matchData) {
     showResultPopup();
 }
 
-// 중간 유사도(0.5-0.75) 매치 처리 - 후보자 목록 표시
+// 중간 유사도(0.6-0.75) 매치 처리 - 후보자 목록 표시
 function handleMediumConfidenceMatches(candidates) {
     if (recognitionStatusElement) { 
         recognitionStatusElement.textContent = `유사한 얼굴 ${candidates.length}명 발견`;

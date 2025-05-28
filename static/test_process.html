@@ -361,7 +361,7 @@
                         position: compareResult.best_match.position
                     });
                 } else if (compareResult.match_type === "medium" && compareResult.candidates) {
-                    addResult('⚠️ 중간 유사도 매치 (0.5-0.7)', 'info', {
+                    addResult('⚠️ 중간 유사도 매치 (0.6-0.7)', 'info', {
                         candidates_count: compareResult.candidates.length,
                         candidates: compareResult.candidates.map(c => ({
                             name: c.name,
@@ -369,7 +369,7 @@
                         }))
                     });
                 } else {
-                    addResult('❌ 낮은 유사도 (0.5 미만)', 'error', {
+                    addResult('❌ 낮은 유사도 (0.6 미만)', 'error', {
                         message: '일치하는 얼굴을 찾지 못했습니다.'
                     });
                 }
