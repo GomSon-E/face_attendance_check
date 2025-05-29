@@ -97,7 +97,6 @@ html, body {
     min-height: auto;
 }
 
-
 /* 팝업 제목 */
 #result-popup-content h2 {
     margin-top: 0;
@@ -211,7 +210,7 @@ html, body {
     min-height: 270px;
 }
 
-/* 후보자 카드 */
+/* 후보자 카드 - 업데이트됨 */
 .candidate-card {
     display: flex;
     align-items: center;
@@ -221,19 +220,42 @@ html, body {
     padding: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-height: 80px;
-    height: 80px;
+    min-height: 100px;
+    height: auto;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .candidate-card:hover {
     background-color: #e9ecef;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    border-color: #2980b9;
 }
 
 .candidate-card.selected {
     border-color: #2980b9;
     background-color: #ebf5fb;
+    box-shadow: 0 2px 8px rgba(41, 128, 185, 0.3);
+}
+
+/* 클릭 안내 텍스트 추가 */
+.candidate-card::after {
+    content: "클릭하여 출근 등록";
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    font-size: 0.7rem;
+    color: #666;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 1;
+}
+
+.candidate-card:hover::after {
+    opacity: 1;
 }
 
 .candidate-image {
@@ -253,6 +275,8 @@ html, body {
     flex-direction: column;
     justify-content: center;
     min-width: 0;
+    padding-right: 40px;
+    overflow: hidden;
 }
 
 .candidate-name {
@@ -262,49 +286,73 @@ html, body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    width: 100%;
 }
 
 .candidate-details {
     color: #666;
     font-size: 0.9rem;
-    margin: 0 0 5px 0;
+    margin: 0 0 8px 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* 유사도 정보 컨테이너 - 새로 추가됨 */
+.similarity-info {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+    flex-wrap: wrap;
 }
 
 .similarity-badge {
     background-color: #2980b9;
     color: white;
-    border-radius: 30px;
-    padding: 3px 8px;
-    font-size: 0.8rem;
-    margin-left: 10px;
+    border-radius: 15px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
-/* 후보자 최종 선택 버튼 */
-#confirm-candidate-btn {
-    margin-top: 15px;
-    padding: 12px 20px;
-    background-color: #4CAF50;
-    color: white;
+/* 얼굴 개수 정보 스타일 - 새로 추가됨 */
+.face-count-info {
+    font-size: 0.7rem;
+    color: #666;
+    background-color: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* 후보자 액션 버튼 영역 - 새로 추가됨 */
+.candidate-actions {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.candidate-actions button {
+    padding: 10px 20px;
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 14px;
     transition: background-color 0.3s ease;
-    width: 100%;
-    height: 45px;
+    min-width: 100px;
 }
 
-#confirm-candidate-btn:hover {
-    background-color: #45a049;
-}
-
-#confirm-candidate-btn:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
+/* 후보자 최종 선택 버튼 - 제거됨 */
+#confirm-candidate-btn {
+    display: none; /* 더 이상 사용하지 않음 */
 }
 
 /* 후보자 선택 안내 메시지 */
@@ -470,34 +518,65 @@ html, body {
     .candidate-card {
         flex-direction: column;
         text-align: center;
-        padding: 10px;
-        min-height: 70px;
+        padding: 15px 10px;
+        min-height: auto;
         height: auto;
+    }
+    
+    .candidate-card::after {
+        top: 2px;
+        right: 5px;
+        font-size: 0.6rem;
     }
     
     .candidate-image {
         width: 50px;
         height: 50px;
         margin-right: 0;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
     }
     
     .candidate-info {
         text-align: center;
+        padding-right: 0;
+        width: 100%;
     }
 
     .candidate-name {
         font-size: 1rem;
+        white-space: normal;
+        word-break: break-word;
     }
     
     .candidate-details {
         font-size: 0.8rem;
+        white-space: normal;
+        word-break: break-word;
+        margin-bottom: 10px;
+    }
+    
+    .similarity-info {
+        justify-content: center;
+        margin-top: 8px;
+        gap: 6px;
     }
     
     .similarity-badge {
-        margin-left: 0;
-        margin-top: 5px;
-        align-self: center;
+        font-size: 0.7rem;
+    }
+    
+    .face-count-info {
+        font-size: 0.65rem;
+    }
+    
+    .candidate-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .candidate-actions button {
+        width: 100%;
+        min-width: auto;
     }
 
     #hamburger-menu {

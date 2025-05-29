@@ -399,7 +399,7 @@ function handleHighConfidenceMatch(matchData) {
 // 중간 유사도(0.6-0.75) 매치 처리 - 후보자 목록 표시
 function handleMediumConfidenceMatches(candidates) {
     if (recognitionStatusElement) { 
-        recognitionStatusElement.textContent = `유사한 얼굴 ${candidates.length}명 발견`;
+        recognitionStatusElement.textContent = `유사한 직원 ${candidates.length}명 발견`;
         recognitionStatusElement.className = 'status-waiting'; 
     }
 
@@ -411,6 +411,12 @@ function handleMediumConfidenceMatches(candidates) {
     multipleMatchesSection.style.display = "block";
     noMatchSection.style.display = "none";
     
+    // 안내 메시지 업데이트
+    const instructionElement = document.querySelector('.candidate-instruction');
+    if (instructionElement) {
+        instructionElement.innerHTML = '아래 후보 중 본인을 <strong>클릭</strong>하여 출근 등록하세요:';
+    }
+    
     // 후보자 목록 초기화
     candidateList.innerHTML = '';
     selectedCandidateId = null;
@@ -420,6 +426,7 @@ function handleMediumConfidenceMatches(candidates) {
         const candidateCard = document.createElement('div');
         candidateCard.className = 'candidate-card';
         candidateCard.dataset.id = candidate.id;
+        candidateCard.dataset.employeeId = candidate.employee_id;
         
         const img = document.createElement('img');
         img.className = 'candidate-image';
@@ -437,57 +444,71 @@ function handleMediumConfidenceMatches(candidates) {
         detailsP.className = 'candidate-details';
         detailsP.textContent = `${candidate.department || '-'} / ${candidate.position || '-'} / ${candidate.employeeId || '-'}`;
         
+        const similarityDiv = document.createElement('div');
+        similarityDiv.className = 'similarity-info';
+        
         const similaritySpan = document.createElement('span');
         similaritySpan.className = 'similarity-badge';
         similaritySpan.textContent = `유사도: ${Math.round(candidate.confidence * 100)}%`;
         
+        // 등록된 얼굴 수 표시 (1개 이상일 때만)
+        if (candidate.face_count && candidate.face_count > 1) {
+            const faceCountSpan = document.createElement('span');
+            faceCountSpan.className = 'face-count-info';
+            faceCountSpan.textContent = `등록된 얼굴: ${candidate.face_count}개`;
+            faceCountSpan.style.fontSize = '0.7rem';
+            faceCountSpan.style.color = '#666';
+            faceCountSpan.style.marginTop = '2px';
+            faceCountSpan.style.display = 'block';
+            
+            similarityDiv.appendChild(similaritySpan);
+            similarityDiv.appendChild(faceCountSpan);
+        } else {
+            similarityDiv.appendChild(similaritySpan);
+        }
+        
         infoDiv.appendChild(nameP);
         infoDiv.appendChild(detailsP);
-        infoDiv.appendChild(similaritySpan);
+        infoDiv.appendChild(similarityDiv);
         
         candidateCard.appendChild(img);
         candidateCard.appendChild(infoDiv);
         
-        // 카드 클릭 이벤트 처리
+        // 카드 클릭 이벤트 처리 - 바로 출근 등록
         candidateCard.onclick = function() {
-            // 이전 선택 항목의 선택 표시 제거
+            // 클릭한 카드에 선택 효과 표시
             document.querySelectorAll('.candidate-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            // 현재 항목 선택 표시
             this.classList.add('selected');
-            // 선택된 ID 저장
-            selectedCandidateId = this.dataset.id;
-            // 확인 버튼 활성화
-            if (confirmCandidateBtn) {
-                confirmCandidateBtn.disabled = false;
+            
+            // 선택된 후보자 정보 가져오기
+            const employeeId = this.dataset.employeeId;
+            const selectedCandidate = candidates.find(c => c.employee_id == employeeId);
+            
+            if (selectedCandidate) {
+                // 바로 출근 등록 처리
+                handleAttendanceRegistration(selectedCandidate.name, true);
             }
         };
         
         candidateList.appendChild(candidateCard);
     });
     
-    // 후보자 확인 버튼 추가
-    const buttonDiv = document.createElement('div');
-    buttonDiv.className = 'candidate-confirm';
+    // 하단 액션 버튼들 추가
+    const actionButtonsDiv = document.createElement('div');
+    actionButtonsDiv.className = 'candidate-actions';
     
-    confirmCandidateBtn = document.createElement('button');
-    confirmCandidateBtn.id = 'confirm-candidate-btn';
-    confirmCandidateBtn.textContent = '선택한 사용자로 출근 등록';
-    confirmCandidateBtn.disabled = true; // 초기에는 비활성화
-    
-    confirmCandidateBtn.onclick = function() {
-        if (selectedCandidateId !== null) {
-            const selectedCandidate = candidates.find(c => c.id == selectedCandidateId);
-            if (selectedCandidate) {
-                // 출근 등록 및 얼굴 추가 등록
-                handleAttendanceRegistration(selectedCandidate.name, true);
-            }
-        }
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'secondary-btn';
+    retryBtn.textContent = '다시 시도';
+    retryBtn.onclick = function() {
+        hideResultPopup();
+        openCamera();
     };
     
-    buttonDiv.appendChild(confirmCandidateBtn);
-    candidateList.appendChild(buttonDiv);
+    actionButtonsDiv.appendChild(retryBtn);
+    candidateList.appendChild(actionButtonsDiv);
     
     // 팝업 표시
     showResultPopup();
@@ -531,7 +552,7 @@ async function handleAttendanceRegistration(personName, registerNewFace) {
             // 후보자 목록에서 선택된 사용자의 정보 찾기
             const candidateCards = document.querySelectorAll('.candidate-card');
             candidateCards.forEach(card => {
-                if (card.dataset.id == selectedCandidateId) {
+                if (card.dataset.employeeId == selectedCandidateId) {
                     const nameElement = card.querySelector('.candidate-name');
                     const detailsElement = card.querySelector('.candidate-details');
                     
@@ -589,6 +610,7 @@ async function handleAttendanceRegistration(personName, registerNewFace) {
         showAttendanceError(error.message);
     }
 }
+
 // 본인 부정 처리
 function handleIdentityDenial() {
     // 단일 매치 섹션 숨기기

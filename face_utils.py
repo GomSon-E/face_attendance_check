@@ -584,11 +584,52 @@ def compare_face(image_data: str) -> Dict[str, Any]:
                 "best_match": best_match
             }
         
-        # 2. 0.6 이상 0.75 미만 유사도: 상위 3개 후보 반환
+        # 2. 0.6 이상 0.75 미만 유사도: 직원별로 그룹화하여 후보 반환
         medium_matches = [match for match in matches if high_threshold > match["confidence"] >= medium_threshold]
         if medium_matches:
-            # 최대 3개까지만 반환
-            candidates = medium_matches[:3]
+            # 직원별로 그룹화
+            employee_groups = {}
+            for match in medium_matches:
+                employee_id = match["employee_id"]
+                if employee_id not in employee_groups:
+                    employee_groups[employee_id] = {
+                        "employee_id": employee_id,
+                        "name": match["name"],
+                        "department": match["department"],
+                        "position": match["position"],
+                        "employeeId": match["employeeId"],
+                        "max_confidence": match["confidence"],
+                        "face_count": 1,
+                        "best_image_base64": match["image_base64"],
+                        "best_encoding_id": match["id"]
+                    }
+                else:
+                    # 기존 직원의 더 높은 유사도 발견 시 업데이트
+                    if match["confidence"] > employee_groups[employee_id]["max_confidence"]:
+                        employee_groups[employee_id]["max_confidence"] = match["confidence"]
+                        employee_groups[employee_id]["best_image_base64"] = match["image_base64"]
+                        employee_groups[employee_id]["best_encoding_id"] = match["id"]
+                    employee_groups[employee_id]["face_count"] += 1
+            
+            # 그룹화된 후보자들을 유사도 순으로 정렬하고 최대 3명까지만 반환
+            grouped_candidates = list(employee_groups.values())
+            grouped_candidates = sorted(grouped_candidates, key=lambda x: x["max_confidence"], reverse=True)
+            grouped_candidates = grouped_candidates[:3]
+            
+            # 응답용 형식으로 변환
+            candidates = []
+            for candidate in grouped_candidates:
+                candidates.append({
+                    "id": candidate["best_encoding_id"],  # 가장 높은 유사도를 가진 얼굴의 ID
+                    "employee_id": candidate["employee_id"],
+                    "name": candidate["name"],
+                    "department": candidate["department"],
+                    "position": candidate["position"],
+                    "employeeId": candidate["employeeId"],
+                    "confidence": candidate["max_confidence"],
+                    "image_base64": candidate["best_image_base64"],
+                    "face_count": candidate["face_count"]  # 해당 직원의 등록된 얼굴 수
+                })
             
             timestamp_face_compare_end = datetime.now()
             print('Timestamp - Face Compare End (Medium):', timestamp_face_compare_end)
