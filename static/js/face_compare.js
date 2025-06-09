@@ -34,8 +34,8 @@ var confirmCandidateBtn;  // 동적으로 생성됨
 var isProcessing = false;
 // 얼굴 비교 작업이 진행 중인지
 var isComparingFace = false;
-// 현재 선택된 후보자 ID
-var selectedCandidateId = null;
+// 현재 선택된 후보자
+var selectedCandidate = null;
 // 캡처된 원본 이미지 데이터 (후보자 선택 시 얼굴 등록에 사용)
 var capturedOriginalImage = null;
 
@@ -450,6 +450,19 @@ function handleMediumConfidenceMatches(candidates) {
         const similaritySpan = document.createElement('span');
         similaritySpan.className = 'similarity-badge';
         similaritySpan.textContent = `유사도: ${Math.round(candidate.confidence * 100)}%`;
+
+        const actionButtonsDiv = document.createElement('div');
+        actionButtonsDiv.className = 'candidate-actions';
+        actionButtonsDiv.style.cssText = 'margin-top: 20px; display: flex; gap: 10px; justify-content: center;';
+
+        const retryBtn = document.createElement('button');
+        retryBtn.className = 'secondary-btn';
+        retryBtn.textContent = '다시 시도';
+        retryBtn.style.cssText = 'padding: 10px 20px; font-size: 14px;';
+        retryBtn.onclick = function() {
+            hideResultPopup();
+            openCamera();
+        };
         
         // 등록된 얼굴 수 표시 (1개 이상일 때만)
         if (candidate.face_count && candidate.face_count > 1) {
@@ -482,14 +495,11 @@ function handleMediumConfidenceMatches(candidates) {
             });
             this.classList.add('selected');
             
-            // 선택된 후보자 정보 가져오기
-            const employeeId = this.dataset.employeeId;
-            const selectedCandidate = candidates.find(c => c.employee_id == employeeId);
+            // 선택된 후보자 정보 전역 변수에 저장
+            selectedCandidate = candidate;
             
-            if (selectedCandidate) {
-                // 바로 출근 등록 처리
-                handleAttendanceRegistration(selectedCandidate.name, true);
-            }
+            // 바로 출근 등록 처리 (새로운 얼굴 이미지도 함께 등록)
+            handleAttendanceRegistration(candidate.name, true);
         };
         
         candidateList.appendChild(candidateCard);
@@ -576,13 +586,14 @@ async function handleAttendanceRegistration(personName, registerNewFace) {
         };
         
         // 새 얼굴 등록이 필요한 경우 - 선택된 사용자의 정보와 함께 전송
-        if (registerNewFace && capturedOriginalImage && selectedCandidateInfo) {
+        if (registerNewFace && capturedOriginalImage && selectedCandidate) {
             attendanceData.image = capturedOriginalImage;
             attendanceData.userInfo = {
-                department: selectedCandidateInfo.department,
-                position: selectedCandidateInfo.position,
-                employeeId: selectedCandidateInfo.employeeId
+                department: selectedCandidate.department || '',
+                position: selectedCandidate.position || '',
+                employeeId: selectedCandidate.employeeId || ''
             };
+            console.log('새 얼굴 등록 정보:', attendanceData.userInfo);
         }
         
         const response = await fetch('/api/register-attendance', {
