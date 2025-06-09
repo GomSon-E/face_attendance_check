@@ -22,6 +22,170 @@ html, body {
     z-index: 1;
 }
 
+/* 얼굴 가이드 오버레이 */
+#face-guide-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+}
+
+/* 가이드 숨김 상태 */
+#face-guide-overlay.hidden {
+    opacity: 0;
+}
+
+/* 반투명 검정 배경 (원 내부만 투명) */
+.guide-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    
+    -webkit-mask: radial-gradient(
+        circle at center,
+        transparent 33vh,
+        transparent 34vh
+    );
+    mask: radial-gradient(
+        circle at center,
+        transparent 33vh,
+        transparent 34vh
+    );
+}
+
+/* 원형 가이드 테두리 */
+.guide-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 90vh;
+    height: 105vh;
+    border: 3px solid rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    
+    /* 애니메이션 효과 */
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* 펄스 애니메이션 */
+@keyframes pulse {
+    0%, 100% {
+        border-color: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+    }
+    50% {
+        border-color: rgba(255, 255, 255, 1);
+        box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+    }
+}
+
+/* 얼굴 감지 상태에 따른 가이드 색상 변경 */
+.guide-circle.face-detected {
+    border-color: #4CAF50;
+    animation: pulse-green 1.5s ease-in-out infinite;
+}
+
+.guide-circle.face-too-small {
+    border-color: #FFC107;
+    animation: pulse-yellow 1.5s ease-in-out infinite;
+}
+
+.guide-circle.face-good-size {
+    border-color: #4CAF50;
+    animation: pulse-green 1.5s ease-in-out infinite;
+}
+
+.guide-circle.face-ready {
+    border-color: #2196F3;
+    animation: pulse-blue 1s ease-in-out infinite;
+}
+
+@keyframes pulse-green {
+    0%, 100% {
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4);
+    }
+    50% {
+        border-color: #66BB6A;
+        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+    }
+}
+
+@keyframes pulse-yellow {
+    0%, 100% {
+        border-color: #FFC107;
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4);
+    }
+    50% {
+        border-color: #FFD54F;
+        box-shadow: 0 0 0 10px rgba(255, 193, 7, 0);
+    }
+}
+
+@keyframes pulse-blue {
+    0%, 100% {
+        border-color: #2196F3;
+        box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.4);
+    }
+    50% {
+        border-color: #64B5F6;
+        box-shadow: 0 0 0 15px rgba(33, 150, 243, 0);
+    }
+}
+
+/* 가이드 텍스트 */
+.guide-text {
+    position: absolute;
+    bottom: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    z-index: 6;
+    max-width: 80%;
+    line-height: 1.4;
+}
+
+/* 가이드 아이콘 */
+.guide-icons {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 48px;
+    z-index: 6;
+}
+
+.icon-face {
+    animation: bounce 2s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
 /* 상태 표시 영역 */
 #status-container {
     position: fixed;
@@ -210,7 +374,7 @@ html, body {
     min-height: 270px;
 }
 
-/* 후보자 카드 - 업데이트됨 */
+/* 후보자 카드 */
 .candidate-card {
     display: flex;
     align-items: center;
@@ -220,42 +384,19 @@ html, body {
     padding: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
-    min-height: 100px;
-    height: auto;
-    position: relative;
-    overflow: hidden;
-    width: 100%;
-    box-sizing: border-box;
+    min-height: 80px;
+    height: 80px;
 }
 
 .candidate-card:hover {
     background-color: #e9ecef;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    border-color: #2980b9;
 }
 
 .candidate-card.selected {
     border-color: #2980b9;
     background-color: #ebf5fb;
-    box-shadow: 0 2px 8px rgba(41, 128, 185, 0.3);
-}
-
-/* 클릭 안내 텍스트 추가 */
-.candidate-card::after {
-    content: "클릭하여 출근 등록";
-    position: absolute;
-    top: 5px;
-    right: 10px;
-    font-size: 0.7rem;
-    color: #666;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    z-index: 1;
-}
-
-.candidate-card:hover::after {
-    opacity: 1;
 }
 
 .candidate-image {
@@ -275,8 +416,6 @@ html, body {
     flex-direction: column;
     justify-content: center;
     min-width: 0;
-    padding-right: 40px;
-    overflow: hidden;
 }
 
 .candidate-name {
@@ -286,73 +425,49 @@ html, body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 100%;
 }
 
 .candidate-details {
     color: #666;
     font-size: 0.9rem;
-    margin: 0 0 8px 0;
+    margin: 0 0 5px 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    width: 100%;
-}
-
-/* 유사도 정보 컨테이너 - 새로 추가됨 */
-.similarity-info {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    margin-top: 5px;
-    flex-wrap: wrap;
 }
 
 .similarity-badge {
     background-color: #2980b9;
     color: white;
-    border-radius: 15px;
-    padding: 2px 8px;
-    font-size: 0.75rem;
+    border-radius: 30px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
+    margin-left: 10px;
     flex-shrink: 0;
-    white-space: nowrap;
 }
 
-/* 얼굴 개수 정보 스타일 - 새로 추가됨 */
-.face-count-info {
-    font-size: 0.7rem;
-    color: #666;
-    background-color: #f0f0f0;
-    padding: 2px 6px;
-    border-radius: 10px;
-    flex-shrink: 0;
-    white-space: nowrap;
-}
-
-/* 후보자 액션 버튼 영역 - 새로 추가됨 */
-.candidate-actions {
-    margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid #ddd;
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-}
-
-.candidate-actions button {
-    padding: 10px 20px;
+/* 후보자 최종 선택 버튼 */
+#confirm-candidate-btn {
+    margin-top: 15px;
+    padding: 12px 20px;
+    background-color: #4CAF50;
+    color: white;
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 1rem;
     transition: background-color 0.3s ease;
-    min-width: 100px;
+    width: 100%;
+    height: 45px;
 }
 
-/* 후보자 최종 선택 버튼 - 제거됨 */
-#confirm-candidate-btn {
-    display: none; /* 더 이상 사용하지 않음 */
+#confirm-candidate-btn:hover {
+    background-color: #45a049;
+}
+
+#confirm-candidate-btn:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
 }
 
 /* 후보자 선택 안내 메시지 */
@@ -486,8 +601,42 @@ html, body {
     color: #3498db;
 }
 
-/* 모바일 최적화 */
-@media (max-width: 480px) {
+/* 반응형 스타일 - 모바일 */
+@media (max-width: 768px) {
+    .guide-circle {
+        width: 80vw;
+        height: 80vw;
+    }
+    
+    .guide-mask {
+        -webkit-mask: radial-gradient(
+            circle at center,
+            black 40vw,
+            transparent 41vw
+        );
+        mask: radial-gradient(
+            circle at center,
+            black 40vw,
+            transparent 41vw
+        );
+    }
+    
+    .guide-text {
+        font-size: 16px;
+        bottom: 15%;
+    }
+    
+    .guide-icons {
+        font-size: 36px;
+    }
+    
+    #status-container {
+        font-size: 12px;
+        padding: 8px;
+        top: 5px;
+        left: 5px;
+    }
+    
     #result-popup-content {
         padding: 20px;
         max-width: 90%;
@@ -518,65 +667,34 @@ html, body {
     .candidate-card {
         flex-direction: column;
         text-align: center;
-        padding: 15px 10px;
-        min-height: auto;
+        padding: 10px;
+        min-height: 70px;
         height: auto;
-    }
-    
-    .candidate-card::after {
-        top: 2px;
-        right: 5px;
-        font-size: 0.6rem;
     }
     
     .candidate-image {
         width: 50px;
         height: 50px;
         margin-right: 0;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     
     .candidate-info {
         text-align: center;
-        padding-right: 0;
-        width: 100%;
     }
 
     .candidate-name {
         font-size: 1rem;
-        white-space: normal;
-        word-break: break-word;
     }
     
     .candidate-details {
         font-size: 0.8rem;
-        white-space: normal;
-        word-break: break-word;
-        margin-bottom: 10px;
-    }
-    
-    .similarity-info {
-        justify-content: center;
-        margin-top: 8px;
-        gap: 6px;
     }
     
     .similarity-badge {
-        font-size: 0.7rem;
-    }
-    
-    .face-count-info {
-        font-size: 0.65rem;
-    }
-    
-    .candidate-actions {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .candidate-actions button {
-        width: 100%;
-        min-width: auto;
+        margin-left: 0;
+        margin-top: 5px;
+        align-self: center;
     }
 
     #hamburger-menu {
@@ -591,5 +709,39 @@ html, body {
     .hamburger-nav .nav-item {
         padding: 10px 15px;
         font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .guide-circle {
+        width: 85vw;
+        height: 85vw;
+    }
+    
+    .guide-mask {
+        -webkit-mask: radial-gradient(
+            circle at center,
+            black 42.5vw,
+            transparent 43.5vw
+        );
+        mask: radial-gradient(
+            circle at center,
+            black 42.5vw,
+            transparent 43.5vw
+        );
+    }
+    
+    .guide-text {
+        font-size: 14px;
+        bottom: 12%;
+    }
+    
+    .guide-icons {
+        font-size: 32px;
+    }
+    
+    #status-container {
+        font-size: 11px;
+        padding: 6px;
     }
 }
