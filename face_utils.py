@@ -8,6 +8,7 @@ from datetime import datetime
 from fastapi import HTTPException
 import mediapipe as mp
 from typing import Dict, Any, List
+import gc
 
 # 자체 모듈 임포트
 from config import DATA_DIR, FACE_MODEL, DETECTOR_BACKEND, create_path
@@ -27,22 +28,6 @@ try:
 except Exception as e:
     print(f"DeepFace 로딩 실패: {e}")
     exit(1)
-
-# MediaPipe Face Mesh 초기화
-try:
-    mp_face_mesh = mp.solutions.face_mesh
-    face_mesh = mp_face_mesh.FaceMesh(
-        static_image_mode=True,
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    )
-    MEDIAPIPE_AVAILABLE = True
-    print("MediaPipe Face Mesh initialized successfully")
-except Exception as e:
-    print(f"Warning: MediaPipe not available: {e}. Using basic face detection.")
-    MEDIAPIPE_AVAILABLE = False
 
 def process_face_image(name, image_data, metadata=None):
     """얼굴 이미지 처리 및 특징 벡터 추출"""
@@ -229,6 +214,21 @@ def validate_facial_features_with_mediapipe(img, face_region):
     """
     MediaPipe를 사용하여 얼굴의 주요 특징(눈, 코, 입)이 모두 존재하는지 검증
     """
+    try:
+        mp_face_mesh = mp.solutions.face_mesh
+        face_mesh = mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+        MEDIAPIPE_AVAILABLE = True
+        print("MediaPipe Face Mesh initialized successfully")
+    except Exception as e:
+        print(f"Warning: MediaPipe not available: {e}. Using basic face detection.")
+        MEDIAPIPE_AVAILABLE = False
+
     if not MEDIAPIPE_AVAILABLE:
         return True  # MediaPipe가 없으면 기본 검증을 통과시킴
     
@@ -395,7 +395,7 @@ def detect_face(image_data: str) -> Dict[str, Any]:
         
         # 이미지 향상 적용 (밝기 및 대비 조정)
         enhanced_img = cv2.convertScaleAbs(img, alpha=1.5, beta=30)
-        
+
         # DeepFace로 얼굴 감지
         faces = DeepFace.extract_faces(
             img_path=enhanced_img,
@@ -663,6 +663,9 @@ def compare_face(image_data: str) -> Dict[str, Any]:
             "success": False,
             "message": f"얼굴 비교 중 오류: {str(e)}"
         }
+    finally:
+        # 강제 가비지 컬렉션
+        gc.collect()
 
 def register_attendance(name, image_data=None):
     """출퇴근 기록 등록"""
