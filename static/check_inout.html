@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출퇴근 선택</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            background: #1a1a2e;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        .button-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            gap: 4px;
+            padding: 20px;
+        }
+        
+        .attendance-btn {
+            flex: 1;
+            border: none;
+            cursor: pointer;
+            font-size: 3.5rem;
+            font-weight: 800;
+            transition: all 0.1s ease;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            text-shadow: none;
+            border-radius: 20px;
+            box-shadow: 
+                0 8px 16px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.1),
+                inset 0 -1px 0 rgba(0,0,0,0.2);
+        }
+        
+        .attendance-btn span {
+            font-size: 3.5rem;
+            letter-spacing: 2px;
+        }
+        
+        .check-in {
+            background: linear-gradient(145deg, #ffd700, #ffb347);
+            border: 2px solid #e6c200;
+            color: #333333;
+        }
+        
+        .check-out {
+            background: linear-gradient(145deg, #2c2c2c, #1a1a1a);
+            border: 2px solid #333333;
+            color: white;
+        }
+        
+        .attendance-btn:active {
+            transform: translateY(2px);
+            box-shadow: 
+                0 4px 8px rgba(0,0,0,0.4),
+                inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        /* 아이콘 스타일 */
+        .icon {
+            font-size: 5rem;
+            margin-bottom: -10px;
+        }
+        
+        /* 설명 텍스트 */
+        .description {
+            font-size: 1.2rem;
+            font-weight: 400;
+            opacity: 0.9;
+            margin-top: 10px;
+            letter-spacing: 1px;
+        }
+
+        /* 햄버거 메뉴 스타일 */
+        #hamburger-menu {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 1000;
+        }
+
+        .hamburger-button {
+            width: 45px;
+            height: 45px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .hamburger-button:hover {
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+
+        .hamburger-button span {
+            width: 20px;
+            height: 2px;
+            background-color: white;
+            transition: all 0.3s ease;
+            border-radius: 1px;
+        }
+
+        .hamburger-button.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+
+        .hamburger-button.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .hamburger-button.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(4px, -4px);
+        }
+
+        .hamburger-nav {
+            position: absolute;
+            top: 55px;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.9);
+            border-radius: 8px;
+            padding: 10px 0;
+            min-width: 150px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+        }
+
+        .hamburger-nav.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .hamburger-nav .nav-item {
+            display: block;
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            font-size: 14px;
+            transition: background-color 0.2s ease;
+        }
+
+        .hamburger-nav .nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .hamburger-nav .nav-item.active {
+            background-color: rgba(52, 152, 219, 0.5);
+            color: #3498db;
+        }
+
+        
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .attendance-btn span {
+                font-size: 2.8rem;
+            }
+            
+            .icon {
+                font-size: 4rem;
+            }
+            
+            .description {
+                font-size: 1rem;
+            }
+
+            #hamburger-menu {
+                top: 10px;
+                right: 10px;
+            }
+            
+            .hamburger-nav {
+                min-width: 140px;
+            }
+            
+            .hamburger-nav .nav-item {
+                padding: 10px 15px;
+                font-size: 13px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .attendance-btn span {
+                font-size: 2.2rem;
+            }
+            
+            .icon {
+                font-size: 3.5rem;
+            }
+            
+            .description {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="hamburger-menu">
+        <button id="hamburger-btn" class="hamburger-button">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <nav id="hamburger-nav" class="hamburger-nav">
+            <a href="/face_register" class="nav-item">얼굴 등록</a>
+            <a href="/attendance" class="nav-item">기록 조회</a>
+            <a href="/statistics" class="nav-item">통계 분석</a>
+            <a href="/employee_management" class="nav-item">직원 관리</a>
+        </nav>
+    </div>
+
+    <div class="button-container">
+        <button class="attendance-btn check-in" onclick="selectAttendanceType('check-in')">
+            <div class="icon">💼</div>
+            <span>출근</span>
+            <div class="description">좋은 아침이에요!</div>
+        </button>
+        <button class="attendance-btn check-out" onclick="selectAttendanceType('check-out')">
+            <div class="icon">🌙</div>
+            <span>퇴근</span>
+            <div class="description">오늘도 수고하셨어요</div>
+        </button>
+    </div>
+
+    <script>
+        function initHamburgerMenu() {
+            const hamburgerBtn = document.getElementById('hamburger-btn');
+            const hamburgerNav = document.getElementById('hamburger-nav');
+            
+            if (hamburgerBtn && hamburgerNav) {
+                hamburgerBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    hamburgerBtn.classList.toggle('active');
+                    hamburgerNav.classList.toggle('show');
+                });
+                
+                // 메뉴 외부 클릭 시 닫기
+                document.addEventListener('click', function(e) {
+                    if (!document.getElementById('hamburger-menu').contains(e.target)) {
+                        hamburgerBtn.classList.remove('active');
+                        hamburgerNav.classList.remove('show');
+                    }
+                });
+                
+                // ESC 키로 메뉴 닫기
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        hamburgerBtn.classList.remove('active');
+                        hamburgerNav.classList.remove('show');
+                    }
+                });
+            }
+        }
+
+        function selectAttendanceType(type) {
+            // 선택한 출퇴근 타입을 저장 (세션 스토리지 대신 URL 파라미터로 전달)
+            const attendanceType = type === 'check-in' ? 'checkin' : 'checkout';
+            
+            // face_compare.html로 이동하면서 선택한 타입을 파라미터로 전달
+            window.location.href = `face_compare.html?type=${attendanceType}`;
+        }
+        
+        // 키보드 단축키 지원
+        document.addEventListener('keydown', function(event) {
+            if (event.key === '1' || event.key === 'ArrowLeft') {
+                selectAttendanceType('check-in');
+            } else if (event.key === '2' || event.key === 'ArrowRight') {
+                selectAttendanceType('check-out');
+            }
+        });
+        
+        // 터치 이벤트 개선
+        document.querySelectorAll('.attendance-btn').forEach(btn => {
+            btn.addEventListener('touchstart', function() {
+                this.style.transform = 'scale(0.98)';
+            });
+            
+            btn.addEventListener('touchend', function() {
+                this.style.transform = 'scale(1.02)';
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initHamburgerMenu();
+        });
+    </script>
+</body>
+</html>

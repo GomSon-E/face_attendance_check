@@ -89,6 +89,11 @@ def sanitize_json_values(data):
         except:
             return None
 
+@app.get("/check_inout")
+async def check_inout_page():
+    """출퇴근 선택 페이지 반환"""
+    return FileResponse('static/check_inout.html')
+
 @app.get("/face_register")
 async def read_root():
     """루트 경로 접근 시 인덱스 페이지 반환"""
