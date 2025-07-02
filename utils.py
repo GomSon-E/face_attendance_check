@@ -332,32 +332,15 @@ def get_employee_faces_with_base64(employee_id):
         print(f"얼굴 이미지 조회 중 오류: {str(e)}")
         return []
 
-# === 출퇴근 기록 관리 함수들 ===
+# === 출퇴근 기록 관리 함수들 ==
 
-def determine_attendance_tag():
-    """현재 시간에 따른 출퇴근 태그 결정"""
-    current_hour = datetime.datetime.now().hour
-    
-    if ATTENDANCE_TIMES["CLOCK_IN"][0] <= current_hour < ATTENDANCE_TIMES["CLOCK_IN"][1]:
-        return "출근"
-    elif ATTENDANCE_TIMES["LATE"][0] <= current_hour < ATTENDANCE_TIMES["LATE"][1]:
-        return "지각"
-    elif ATTENDANCE_TIMES["NONE"][0] <= current_hour < ATTENDANCE_TIMES["NONE"][1]:
-        return ""
-    elif ATTENDANCE_TIMES["CLOCK_OUT"][0] <= current_hour < ATTENDANCE_TIMES["CLOCK_OUT"][1]:
-        return "퇴근"
-    elif ATTENDANCE_TIMES["EARLY_CLOCK_IN"][0] <= current_hour < ATTENDANCE_TIMES["EARLY_CLOCK_IN"][1]:
-        return ""
-    else:
-        return ""
-
-def record_attendance(employee_id):
+def record_attendance(employee_id, attendance_type='checkin'):
     """출퇴근 기록 저장"""
     try:
         now = datetime.datetime.now()
         date_str = now.strftime("%Y-%m-%d")
         time_str = now.strftime("%H:%M:%S")
-        tag = determine_attendance_tag()
+        tag = '출근' if attendance_type == 'checkin' else '퇴근'
         
         # 출퇴근 기록 CSV 읽기
         df = pd.read_csv(ATTENDANCE_CSV_PATH)

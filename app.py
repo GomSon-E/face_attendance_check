@@ -220,11 +220,12 @@ async def register_attendance_api(data: Dict[str, Any] = Body(...)):
     try:
         name = data.get("name")
         image_data = data.get("image", None)
+        attendance_type = data.get("type", "checkin")  # 출퇴근 타입 추가
         
         if not name:
             raise HTTPException(status_code=400, detail="이름이 필요합니다.")
         
-        result = register_attendance(name, image_data)
+        result = register_attendance(name, image_data, attendance_type)
         
         if result['success']:
             return result

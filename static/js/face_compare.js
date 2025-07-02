@@ -45,6 +45,11 @@ const MIN_FACE_RATIO = 0.1;
 // API 전송 시 이미지 크기 축소 비율
 const IMAGE_SCALE_FACTOR = 0.5;
 
+function getAttendanceTypeFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('type') || 'checkin'; // 기본값은 출근
+}
+
 // 비디오의 현재 프레임을 캡처하여 얼굴 감지 API로 전송
 function captureFrameAndSend() {
     // 비디오가 준비되지 않았거나, 이미 처리 중이거나, 비교 작업 중이면 함수 종료
@@ -582,7 +587,8 @@ async function handleAttendanceRegistration(personName, registerNewFace) {
         }
         
         const attendanceData = {
-            name: personName
+            name: personName,
+            type: attendanceType // 출퇴근 타입 추가
         };
         
         // 새 얼굴 등록이 필요한 경우 - 선택된 사용자의 정보와 함께 전송
@@ -649,11 +655,8 @@ function showAttendanceSuccess(name, date, time, tag, newFaceRegistered) {
     
     let tagText = '';
     switch(tag) {
-        case '출근': tagText = '<span style="color: #2ecc71;">출근</span>'; break;
-        case '퇴근': tagText = '<span style="color: #3498db;">퇴근</span>'; break;
-        case '지각': tagText = '<span style="color: #f39c12;">지각</span>'; break;
-        case '외근': tagText = '<span style="color: #9b59b6;">외근</span>'; break;
-        case '반차': tagText = '<span style="color: #2c3e50;">반차</span>'; break;
+        case '출근': tagText = '<span style="color: #e6c200;">출근</span>'; break;
+        case '퇴근': tagText = '<span style="color: #2c2c2c;">퇴근</span>'; break;
         default: tagText = '<span style="color: #7f8c8d;">기록 없음</span>';
     }
     
@@ -668,7 +671,7 @@ function showAttendanceSuccess(name, date, time, tag, newFaceRegistered) {
     `;
     
     // 팝업 제목 업데이트
-    popupTitleElement.textContent = "출근 등록 완료";
+    popupTitleElement.textContent = `${tagText} 등록 완료`;
 
     playAudio('success'); // 성공 음성 재생
 

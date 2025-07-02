@@ -667,7 +667,7 @@ def compare_face(image_data: str) -> Dict[str, Any]:
         # 강제 가비지 컬렉션
         gc.collect()
 
-def register_attendance(name, image_data=None):
+def register_attendance(name, image_data=None, attendance_type='checkin'):
     """출퇴근 기록 등록"""
     try:
         # 1. 직원 정보 조회
@@ -679,7 +679,7 @@ def register_attendance(name, image_data=None):
             }
         
         # 2. 출퇴근 기록 저장 (employee_id 사용)
-        result = record_attendance(employee_info['employee_id'])
+        result = record_attendance(employee_info['employee_id'], attendance_type)
         
         if result['success']:
             # 3. 결과에 직원 정보 추가
